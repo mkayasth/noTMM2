@@ -1,6 +1,5 @@
 ### run DataCleaning.R first :)
 
-
 library(EnhancedVolcano)
 library(tidyverse)
 library(dplyr)
@@ -73,6 +72,9 @@ t_test_results <- data.frame(
   stringsAsFactors = FALSE
 )
 
+# all p-values for FDR adjustment later.
+all_p_values <- numeric()
+
 # Looping through each gene in dge_gene.
 for (i in 1:nrow(noTMM_candidates)) {
   
@@ -89,6 +91,7 @@ for (i in 1:nrow(noTMM_candidates)) {
   # for a gene, compare c1 and c2 samples.
   t_test <- t.test(c1_group, c2_group)
   p_value_t_test <- t_test$p.value
+  all_p_values <- c(all_p_values, p_value_t_test)
   
   
   # Storing the results.
@@ -97,6 +100,8 @@ for (i in 1:nrow(noTMM_candidates)) {
     p_value_t_test = p_value_t_test
   ))
   
+
+  
   # removing un-required intermediates formed while forming the t-test table above.
   rm(gene_id)
   rm(gene_Expression)
@@ -104,25 +109,77 @@ for (i in 1:nrow(noTMM_candidates)) {
   rm(c2_group)
   rm(p_value_t_test)
   rm(t_test)
-  rm(p_value_t_test)
 }
+
+# Calculating the FDR-adjusted p-values
+t_test_results$fdr_t_test <- p.adjust(all_p_values, method = "BH")
 
 
 t_test_results <- merge(t_test_results, noTMM_candidates[, c("Gene", "Gene Status")],  by = "Gene", all.x = TRUE)
 
 
-# Storing significant t-test results where p-value is less than 0.01.
-t_test_results_sig <- t_test_results[round(t_test_results$p_value_t_test, 2) <= 0.01, ]
+# Storing significant t-test results where FDR is less than 0.01.
+t_test_results_sig <- t_test_results[round(t_test_results$fdr_t_test, 2) <= 0.01, ]
+
+dge_gene <-dge_gene[rownames(dge_gene) %in% t_test_results_sig$Gene, ]
+dge_gene <- dge_gene[match(t_test_results_sig$Gene, rownames(dge_gene)), ]
+
+
+##### 3) Linear regression test of candidate genes.
+regression_results <- data.frame(
+  Gene = character(),
+  estimate = numeric(),
+  p_value = numeric(),
+  R.squared = numeric(),
+  stringsAsFactors = FALSE
+)
+
+# for each gene in the candidate list, updating regression_results.
+for (gene in rownames(dge_gene)) {
+  
+  data <- data.frame(gene_Expression = as.numeric(dge_gene[gene, ]), 
+                     TMMstatus = metadata$TMM_Case)
+  
+  # Fit linear model.
+  model <- lm(gene_Expression ~ TMMstatus, data = data)
+  summary_model <- summary(model)
+  
+  
+  # Store regression results.
+  regression_results <- rbind(regression_results, data.frame(
+    Gene = gene,
+    estimate = summary_model$coefficients[2, 1],
+    p_value = summary_model$coefficients[2, 4],
+    R.Squared = summary_model$r.squared
+  ))
+  
+  # removing intermediates.
+  rm(data)
+  rm(summary_model)
+  rm(gene)
+  rm(estimate)
+  rm(p_value)
+  rm(R.squared)
+}
+
+# adjusted p-values.
+regression_results$Adj.P.Value <- p.adjust(regression_results$p_value, method = "fdr")
+
+# Filtering for r-squared >= 0.2 & fdr <= 0.01.
+regression_results_sig <- regression_results %>%
+  filter(round(Adj.P.Value, 2) <= 0.01 & round(R.Squared, 1) >= 0.2)
+regression_results_sig <- merge(regression_results_sig, noTMM_candidates[, c("Gene", "Gene Status")],  by = "Gene", all.x = TRUE)
+
 
 ##### Making volcano plot for NO_TMM vs. TMM.
 
-top_labels <- t_test_results_sig$Gene
+top_labels <- regression_results_sig$Gene
 
 EnhancedVolcano(noTMM_results,
                 lab = rownames(noTMM_results),
                 x = 'logFC',
                 y = 'adj.P.Val',
-                #selectLab = top_labels,  # highlighting signature genes.
+                selectLab = top_labels,  # highlighting signature genes.
                 xlab = bquote(~Log[2]~ 'fold change'),
                 ylab = bquote(~-Log[10]~ 'FDR'),
                 title = NULL,
@@ -134,7 +191,7 @@ EnhancedVolcano(noTMM_results,
                 max.overlaps = 13,
                 labFace = 'bold',
                 boxedLabels = TRUE,
-                labSize = 5.0,
+                labSize = 1.0,
                 drawConnectors = TRUE,
                 widthConnectors = 0.3,
                 colAlpha = 0.8,
@@ -224,6 +281,10 @@ t_test_results2 <- data.frame(
   stringsAsFactors = FALSE
 )
 
+# all p-values for FDR adjustment later.
+all_p_values <- numeric()
+
+
 # Looping through each gene in dge_gene.
 for (i in 1:nrow(noTMM_candidates)) {
   
@@ -240,6 +301,7 @@ for (i in 1:nrow(noTMM_candidates)) {
   # for a gene, compare c1 and c2 samples.
   t_test <- t.test(c1_group, c2_group)
   p_value_t_test <- t_test$p.value
+  all_p_values <- c(all_p_values, p_value_t_test)
   
   
   # Storing the results.
@@ -255,25 +317,76 @@ for (i in 1:nrow(noTMM_candidates)) {
   rm(c2_group)
   rm(p_value_t_test)
   rm(t_test)
-  rm(p_value_t_test)
 }
 
+
+# Calculating the FDR-adjusted p-values
+t_test_results2$fdr_t_test <- p.adjust(all_p_values, method = "BH")
 
 t_test_results2 <- merge(t_test_results2, noTMM_candidates[, c("Gene", "Gene Status")],  by = "Gene", all.x = TRUE)
 
 
-# Storing significant t-test results where p-value is less than 0.01.
-t_test_results_sig2 <- t_test_results2[round(t_test_results2$p_value_t_test, 2) <= 0.01, ]
+# Storing significant t-test results where FDR is less than 0.01.
+t_test_results_sig2 <- t_test_results2[round(t_test_results2$fdr_t_test, 2) <= 0.01, ]
+
+dge_gene <-dge_gene[rownames(dge_gene) %in% t_test_results_sig2$Gene, ]
+dge_gene <- dge_gene[match(t_test_results_sig2$Gene, rownames(dge_gene)), ]
+
+
+##### 3) Linear regression test of candidate genes.
+regression_results2 <- data.frame(
+  Gene = character(),
+  estimate = numeric(),
+  p_value = numeric(),
+  R.squared = numeric(),
+  stringsAsFactors = FALSE
+)
+
+# for each gene in the candidate list, updating regression_results.
+for (gene in rownames(dge_gene)) {
+  
+  data <- data.frame(gene_Expression = as.numeric(dge_gene[gene, ]), 
+                     TMMstatus = metadata_ALT$TMM)
+  
+  # Fit linear model.
+  model <- lm(gene_Expression ~ TMMstatus, data = data)
+  summary_model <- summary(model)
+  
+  
+  # Store regression results.
+  regression_results2 <- rbind(regression_results2, data.frame(
+    Gene = gene,
+    estimate = summary_model$coefficients[2, 1],
+    p_value = summary_model$coefficients[2, 4],
+    R.Squared = summary_model$r.squared
+  ))
+  
+  # removing intermediates.
+  rm(data)
+  rm(summary_model)
+  rm(gene)
+  rm(estimate)
+  rm(p_value)
+  rm(R.squared)
+}
+
+# adjusted p-values.
+regression_results2$Adj.P.Value <- p.adjust(regression_results2$p_value, method = "fdr")
+
+# Filtering for r-squared > 0.2 & fdr < 0.01.
+regression_results_sig2 <- regression_results2 %>%
+  filter(round(Adj.P.Value, 2) <= 0.01 & round(R.Squared, 1) >= 0.2)
+regression_results_sig2 <- merge(regression_results_sig2, noTMM_candidates[, c("Gene", "Gene Status")],  by = "Gene", all.x = TRUE)
 
 ##### Making volcano plot for NO_TMM vs. TMM.
 
-top_labels <- t_test_results_sig2$Gene
+top_labels <- regression_results_sig2$Gene
 
 EnhancedVolcano(noTMM_results,
                 lab = rownames(noTMM_results),
                 x = 'logFC',
                 y = 'adj.P.Val',
-                # selectLab = top_labels,  # highlighting signature genes.
+                selectLab = top_labels,  # highlighting signature genes.
                 xlab = bquote(~Log[2]~ 'fold change'),
                 ylab = bquote(~-Log[10]~ 'FDR'),
                 title = NULL,
@@ -285,7 +398,7 @@ EnhancedVolcano(noTMM_results,
                 max.overlaps = 17,
                 labFace = 'bold',
                 boxedLabels = TRUE,
-                labSize = 5.0,
+                labSize = 1.0,
                 drawConnectors = TRUE,
                 widthConnectors = 0.3,
                 colAlpha = 0.8,
@@ -379,6 +492,10 @@ t_test_results3 <- data.frame(
   stringsAsFactors = FALSE
 )
 
+# all p-values for FDR adjustment later.
+all_p_values <- numeric()
+
+
 # Looping through each gene in dge_gene.
 for (i in 1:nrow(noTMM_candidates)) {
   
@@ -395,6 +512,7 @@ for (i in 1:nrow(noTMM_candidates)) {
   # for a gene, compare c1 and c2 samples.
   t_test <- t.test(c1_group, c2_group)
   p_value_t_test <- t_test$p.value
+  all_p_values <- c(all_p_values, p_value_t_test)
   
   
   # Storing the results.
@@ -410,25 +528,76 @@ for (i in 1:nrow(noTMM_candidates)) {
   rm(c2_group)
   rm(p_value_t_test)
   rm(t_test)
-  rm(p_value_t_test)
 }
+
+# Calculating the FDR-adjusted p-values
+t_test_results3$fdr_t_test <- p.adjust(all_p_values, method = "BH")
 
 
 t_test_results3 <- merge(t_test_results3, noTMM_candidates[, c("Gene", "Gene Status")],  by = "Gene", all.x = TRUE)
 
 
 # Storing significant t-test results where p-value is less than 0.01.
-t_test_results_sig3 <- t_test_results3[round(t_test_results3$p_value_t_test, 2) <= 0.01, ]
+t_test_results_sig3 <- t_test_results3[round(t_test_results3$fdr_t_test, 2) <= 0.01, ]
+
+dge_gene <-dge_gene[rownames(dge_gene) %in% t_test_results_sig3$Gene, ]
+dge_gene <- dge_gene[match(t_test_results_sig3$Gene, rownames(dge_gene)), ]
+
+
+##### 3) Linear regression test of candidate genes.
+regression_results3 <- data.frame(
+  Gene = character(),
+  estimate = numeric(),
+  p_value = numeric(),
+  R.squared = numeric(),
+  stringsAsFactors = FALSE
+)
+
+# for each gene in the candidate list, updating regression_results.
+for (gene in rownames(dge_gene)) {
+  
+  data <- data.frame(gene_Expression = as.numeric(dge_gene[gene, ]), 
+                     TMMstatus = metadata_Telomerase$TMM)
+  
+  # Fit linear model.
+  model <- lm(gene_Expression ~ TMMstatus, data = data)
+  summary_model <- summary(model)
+  
+  
+  # Store regression results.
+  regression_results3 <- rbind(regression_results3, data.frame(
+    Gene = gene,
+    estimate = summary_model$coefficients[2, 1],
+    p_value = summary_model$coefficients[2, 4],
+    R.Squared = summary_model$r.squared
+  ))
+  
+  # removing intermediates.
+  rm(data)
+  rm(summary_model)
+  rm(gene)
+  rm(estimate)
+  rm(p_value)
+  rm(R.squared)
+}
+
+# adjusted p-values.
+regression_results3$Adj.P.Value <- p.adjust(regression_results3$p_value, method = "fdr")
+
+# Filtering for r-squared >= 0.2 & fdr <= 0.01.
+regression_results_sig3 <- regression_results3 %>%
+  filter(round(Adj.P.Value, 2) <= 0.01 & round(R.Squared, 1) >= 0.2)
+regression_results_sig3 <- merge(regression_results_sig3, noTMM_candidates[, c("Gene", "Gene Status")],  by = "Gene", all.x = TRUE)
 
 ##### Making volcano plot for NO_TMM vs. TMM.
 
-top_labels <- t_test_results_sig3$Gene
+top_labels <- regression_results_sig3$Gene
 
 EnhancedVolcano(noTMM_results,
                 lab = rownames(noTMM_results),
                 x = 'logFC',
-                y = 'adj.P.Value',
-                #selectLab = top_labels,  # highlighting signature genes.
+                y = 'adj.P.Val',
+                selectLab = top_labels,  # highlighting signature genes.
                 xlab = bquote(~Log[2]~ 'fold change'),
                 ylab = bquote(~-Log[10]~ 'FDR'),
                 title = NULL,
@@ -440,7 +609,7 @@ EnhancedVolcano(noTMM_results,
                 max.overlaps = 17,
                 labFace = 'bold',
                 boxedLabels = TRUE,
-                labSize = 5.0,
+                labSize = 1.0,
                 drawConnectors = TRUE,
                 widthConnectors = 0.3,
                 colAlpha = 0.8,
