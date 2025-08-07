@@ -165,9 +165,9 @@ for (gene in rownames(dge_gene)) {
 # adjusted p-values.
 regression_results$Adj.P.Value <- p.adjust(regression_results$p_value, method = "fdr")
 
-# Filtering for r-squared >= 0.2 & fdr <= 0.01.
+# Filtering for r-squared >= 0.3 & fdr <= 0.01.
 regression_results_sig <- regression_results %>%
-  filter(round(Adj.P.Value, 2) <= 0.01 & round(R.Squared, 1) >= 0.2)
+  filter(round(Adj.P.Value, 2) <= 0.01 & round(R.Squared, 1) >= 0.3)
 regression_results_sig <- merge(regression_results_sig, noTMM_candidates[, c("Gene", "Gene Status")],  by = "Gene", all.x = TRUE)
 
 
@@ -373,9 +373,9 @@ for (gene in rownames(dge_gene)) {
 # adjusted p-values.
 regression_results2$Adj.P.Value <- p.adjust(regression_results2$p_value, method = "fdr")
 
-# Filtering for r-squared > 0.2 & fdr < 0.01.
+# Filtering for r-squared > 0.3 & fdr < 0.01.
 regression_results_sig2 <- regression_results2 %>%
-  filter(round(Adj.P.Value, 2) <= 0.01 & round(R.Squared, 1) >= 0.2)
+  filter(round(Adj.P.Value, 2) <= 0.01 & round(R.Squared, 1) >= 0.3)
 regression_results_sig2 <- merge(regression_results_sig2, noTMM_candidates[, c("Gene", "Gene Status")],  by = "Gene", all.x = TRUE)
 
 ##### Making volcano plot for NO_TMM vs. TMM.
@@ -584,9 +584,9 @@ for (gene in rownames(dge_gene)) {
 # adjusted p-values.
 regression_results3$Adj.P.Value <- p.adjust(regression_results3$p_value, method = "fdr")
 
-# Filtering for r-squared >= 0.2 & fdr <= 0.01.
+# Filtering for r-squared >= 0.3 & fdr <= 0.01.
 regression_results_sig3 <- regression_results3 %>%
-  filter(round(Adj.P.Value, 2) <= 0.01 & round(R.Squared, 1) >= 0.2)
+  filter(round(Adj.P.Value, 2) <= 0.01 & round(R.Squared, 1) >= 0.3)
 regression_results_sig3 <- merge(regression_results_sig3, noTMM_candidates[, c("Gene", "Gene Status")],  by = "Gene", all.x = TRUE)
 
 ##### Making volcano plot for NO_TMM vs. TMM.
@@ -623,6 +623,70 @@ EnhancedVolcano(noTMM_results,
         legend.text = element_text(size = 12),
         legend.title = element_blank(),
         plot.caption = element_text(size = 14))
+
+
+
+##### 
+candidate_genes <- intersect(regression_results_sig2$Gene, regression_results_sig3$Gene)
+
+# boxplots of only the candidate genes.
+
+# layout for subplots.
+num_genes <- length(candidate_genes)
+
+# Saving the plot as a PDF.
+pdf("rna-seq-regression_results.pdf", width = 4, height = 4)
+
+regression_test_candidates <- Expression[rownames(Expression) %in% candidate_genes, ]
+regression_test_candidates <- regression_test_candidates[, match(metadata$SampleID, colnames(regression_test_candidates))]
+
+for (gene in rownames(regression_test_candidates)) {
+  plot_data <- data.frame(gene_Expression = as.numeric(regression_test_candidates[gene, ]), 
+                          TMM = metadata$TMM, TMM_Case = metadata$TMM_Case)
+  
+  # Fit linear model.
+  model <- lm(gene_Expression ~ TMM_Case, data = plot_data)
+  summary_model <- summary(model)
+  r2_label <- paste0("R² = ", round(summary_model$r.squared, 3))
+  
+  
+  # boxplot.
+  p <- ggplot(plot_data, aes(x = TMM, y = gene_Expression, fill = TMM, color = TMM)) +
+    geom_boxplot(size = 0.2, alpha = 0.5, outlier.shape = NA) +
+    geom_point(position = position_jitter(width = 0.2), size = 3) +
+    scale_fill_manual(values = c("ALT"="lightblue", 
+                                 "NO_TMM" = "lightgreen", 
+                                 "Telomerase"="lightpink2")) +
+    scale_color_manual(values = c("ALT"="blue", 
+                                  "Telomerase"="darkred", 
+                                  "NO_TMM" = "darkgreen")) +
+    theme_classic() +
+    labs(title = gene, x = "Class", y = "Expression") +
+    theme(
+      axis.text.x = element_text(vjust = 1, hjust = 1),
+      axis.title = element_text(size = 6),
+      axis.text = element_text(size = 6, face = "bold"),
+      legend.position = "none"
+    ) +
+    annotate("text", label = r2_label, y = max(plot_data$gene_Expression, na.rm = TRUE) * 1.05, x = 2,
+             hjust = 0, size = 4) +
+    stat_compare_means(comparisons = list(c("Telomerase","NO_TMM")), method= "t.test",
+                       method.args = list(alternative ="two.sided"), size = 4, tip.length = 0.01, label.y = max(plot_data$gene_Expression, na.rm = TRUE) * 0.75) +
+    stat_compare_means(comparisons = list(c("ALT","NO_TMM")), method= "t.test",
+                       method.args = list(alternative ="two.sided"), size = 4, tip.length = 0.01, label.y = max(plot_data$gene_Expression, na.rm = TRUE) * 0.90)
+  
+  print(p)
+  
+  rm(summary_model)
+  rm(plot_data)
+  rm(model)
+  rm(r2_label)
+  
+}
+
+dev.off()
+
+#####
 
 
 
