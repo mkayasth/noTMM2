@@ -2,18 +2,24 @@
 
 
 library(EnhancedVolcano)
+library(tidyverse)
+library(dplyr)
 
 
 ##### 1) Doing differential gene expression using Limma for our log raw counts data. NO_TMM vs. TMM.
 
 # creating design matrix for limma.
 metadata$TMM_Case <- as.factor(metadata$TMM_Case)
+metadata <- metadata %>%
+  arrange(TMM_Case)
 
 design <- model.matrix(~ 0 + TMM_Case, data = metadata)
 colnames(design) <- levels(metadata$TMM_Case)
 
 
 # Estimating array weights to account for sample-specific variability in library sizes.
+Expression <- Expression[, match(metadata$SampleID, colnames(Expression))]
+
 weights <- arrayWeights(Expression, design = design)
 
 # Fitting linear model using limma.
@@ -36,11 +42,9 @@ noTMM_results <- topTable(fit2, coef = "NO_TMMvsTMM", number = Inf, adjust = "fd
 # top results for TMM.
 TMM_results <- topTable(fit2, coef = "TMMvsNO_TMM", number = Inf, adjust = "fdr")
 
-### no significant fdr for either case.
-
-# Filtering for p-value < 0.01.
-noTMM_candidates <- noTMM_results[round(noTMM_results$P.Value, 2) <= 0.01 & (noTMM_results$logFC >= 0.5 | noTMM_results$logFC <= -0.5), ]
-TMM_candidates <- TMM_results[round(TMM_results$P.Value, 2) <= 0.01 & (TMM_results$logFC >= 0.5 | TMM_results$logFC <= -0.5), ]
+# Filtering for FDR < 0.01.
+noTMM_candidates <- noTMM_results[round(noTMM_results$adj.P.Val, 2) <= 0.01 & (noTMM_results$logFC >= 0.5 | noTMM_results$logFC <= -0.5), ]
+TMM_candidates <- TMM_results[round(TMM_results$adj.P.Val, 2) <= 0.01 & (TMM_results$logFC >= 0.5 | TMM_results$logFC <= -0.5), ]
 
 
 # in noTMM-TMM, positive genes will have gene status NO_TMM and negative logFC genes will have gene status TMM.
@@ -55,7 +59,6 @@ noTMM_candidates <- noTMM_candidates %>%
     noTMM_candidates$logFC > 0 ~ "NO_TMM",
      noTMM_candidates$logFC < 0 ~ "TMM",
     TRUE ~ "Not significant"))
-
 
 
 
@@ -118,10 +121,10 @@ top_labels <- t_test_results_sig$Gene
 EnhancedVolcano(noTMM_results,
                 lab = rownames(noTMM_results),
                 x = 'logFC',
-                y = 'P.Value',
-                selectLab = top_labels,  # highlighting signature genes.
+                y = 'adj.P.Val',
+                #selectLab = top_labels,  # highlighting signature genes.
                 xlab = bquote(~Log[2]~ 'fold change'),
-                ylab = bquote(~-Log[10]~ 'P-value'),
+                ylab = bquote(~-Log[10]~ 'FDR'),
                 title = NULL,
                 subtitle = NULL,
                 pCutoff = 0.01,
@@ -138,7 +141,7 @@ EnhancedVolcano(noTMM_results,
                 legendLabels = c('Not Significant','Significant logFC','Significant P-value ','Significant P-value & LogFC'),
                 col = c('grey80', 'grey50', 'grey25', 'purple'),
                 ylim = c(0, 5),
-                caption = "Cutoffs: P <= 0.01, |Log2FC| >= 0.5"
+                caption = "Cutoffs: FDR <= 0.01, |Log2FC| >= 0.5"
 ) + theme_classic() + 
   theme(axis.title = element_text(size = 18),
         axis.text = element_text(size = 15),
@@ -155,6 +158,8 @@ metadata_ALT <- metadata[metadata$TMM == "ALT" | metadata$TMM == "NO_TMM", ]
 
 # creating design matrix for limma.
 metadata_ALT$TMM <- as.factor(metadata_ALT$TMM)
+metadata_ALT <- metadata_ALT %>%
+  arrange(TMM)
 
 design <- model.matrix(~ 0 + TMM, data = metadata_ALT)
 colnames(design) <- levels(metadata_ALT$TMM)
@@ -162,6 +167,8 @@ colnames(design) <- levels(metadata_ALT$TMM)
 
 # Estimating array weights to account for sample-specific variability in library sizes.
 ExpressionALT <- Expression[, colnames(Expression) %in% metadata_ALT$SampleID]
+ExpressionALT <- ExpressionALT[, match(metadata_ALT$SampleID, colnames(ExpressionALT))]
+
 weights <- arrayWeights(ExpressionALT, design = design)
 
 # Fitting linear model using limma.
@@ -184,11 +191,10 @@ noTMM_results <- topTable(fit2, coef = "NO_TMMvsALT", number = Inf, adjust = "fd
 # top results for ALT.
 ALT_results <- topTable(fit2, coef = "ALTvsNO_TMM", number = Inf, adjust = "fdr")
 
-### no significant fdr for either case.
 
-# Filtering for p-value < 0.01.
-noTMM_candidates <- noTMM_results[round(noTMM_results$P.Value, 2) <= 0.01 & (noTMM_results$logFC >= 0.5 | noTMM_results$logFC <= -0.5), ]
-ALT_candidates <- ALT_results[round(ALT_results$P.Value, 2) <= 0.01 & (ALT_results$logFC >= 0.5 | ALT_results$logFC <= -0.5), ]
+# Filtering for FDR < 0.01.
+noTMM_candidates <- noTMM_results[round(noTMM_results$adj.P.Val, 2) <= 0.01 & (noTMM_results$logFC >= 0.5 | noTMM_results$logFC <= -0.5), ]
+ALT_candidates <- ALT_results[round(ALT_results$adj.P.Val, 2) <= 0.01 & (ALT_results$logFC >= 0.5 | ALT_results$logFC <= -0.5), ]
 
 
 # in noTMM-TMM, positive genes will have gene status NO_TMM and negative logFC genes will have gene status TMM.
@@ -266,10 +272,10 @@ top_labels <- t_test_results_sig2$Gene
 EnhancedVolcano(noTMM_results,
                 lab = rownames(noTMM_results),
                 x = 'logFC',
-                y = 'P.Value',
-                selectLab = top_labels,  # highlighting signature genes.
+                y = 'adj.P.Val',
+                # selectLab = top_labels,  # highlighting signature genes.
                 xlab = bquote(~Log[2]~ 'fold change'),
-                ylab = bquote(~-Log[10]~ 'P-value'),
+                ylab = bquote(~-Log[10]~ 'FDR'),
                 title = NULL,
                 subtitle = NULL,
                 pCutoff = 0.01,
@@ -286,7 +292,7 @@ EnhancedVolcano(noTMM_results,
                 legendLabels = c('Not Significant','Significant logFC','Significant P-value ','Significant P-value & LogFC'),
                 col = c('grey80', 'grey50', 'grey25', 'purple'),
                 ylim = c(0, 5),
-                caption = "Cutoffs: P <= 0.01, |Log2FC| >= 0.5"
+                caption = "Cutoffs: FDR <= 0.01, |Log2FC| >= 0.5"
 ) + theme_classic() + 
   theme(axis.title = element_text(size = 18),
         axis.text = element_text(size = 15),
@@ -305,12 +311,18 @@ metadata_Telomerase <- metadata[metadata$TMM == "Telomerase" | metadata$TMM == "
 # creating design matrix for limma.
 metadata_Telomerase$TMM <- as.factor(metadata_Telomerase$TMM)
 
+metadata_Telomerase <- metadata_Telomerase %>%
+  arrange(TMM)
+
+
 design <- model.matrix(~ 0 + TMM, data = metadata_Telomerase)
 colnames(design) <- levels(metadata_Telomerase$TMM)
 
 
 # Estimating array weights to account for sample-specific variability in library sizes.
 ExpressionTelomerase <- Expression[, colnames(Expression) %in% metadata_Telomerase$SampleID]
+ExpressionTelomerase <- ExpressionTelomerase[, match(metadata_Telomerase$SampleID, colnames(ExpressionTelomerase))]
+
 weights <- arrayWeights(ExpressionTelomerase, design = design)
 
 # Fitting linear model using limma.
@@ -319,8 +331,8 @@ fit <- eBayes(fit, trend = TRUE)
 
 # Contrasts: NO_TMM vs ALT && ALT vs NO_TMM.
 contrast.matrix <- makeContrasts(
-  NO_TMMvsTelomerase = NO_TMM-Telomerase,
-  TelomerasevsNO_TMM = Telomerase-NO_TMM,
+  NO_TMMvsTelomerase = NO_TMM - Telomerase,
+  TelomerasevsNO_TMM = Telomerase - NO_TMM,
   levels = design
 )
 
@@ -330,14 +342,14 @@ fit2 <- eBayes(fit2, trend = TRUE)
 # top results for NO_TMM.
 noTMM_results <- topTable(fit2, coef = "NO_TMMvsTelomerase", number = Inf, adjust = "fdr")
 
-# top results for ALT.
+# top results for Telomerase.
 telomerase_results <- topTable(fit2, coef = "TelomerasevsNO_TMM", number = Inf, adjust = "fdr")
 
 ### no significant fdr for either case.
 
 # Filtering for p-value < 0.01.
-noTMM_candidates <- noTMM_results[round(noTMM_results$P.Value, 2) <= 0.01 & (noTMM_results$logFC >= 0.5 | noTMM_results$logFC <= -0.5), ]
-telomerase_candidates <- telomerase_results[round(telomerase_results$P.Value, 2) <= 0.01 & (telomerase_results$logFC >= 0.5 | telomerase_results$logFC <= -0.5), ]
+noTMM_candidates <- noTMM_results[round(noTMM_results$adj.P.Val, 2) <= 0.01 & (noTMM_results$logFC >= 0.5 | noTMM_results$logFC <= -0.5), ]
+telomerase_candidates <- telomerase_results[round(telomerase_results$adj.P.Val, 2) <= 0.01 & (telomerase_results$logFC >= 0.5 | telomerase_results$logFC <= -0.5), ]
 
 
 # in noTMM-TMM, positive genes will have gene status NO_TMM and negative logFC genes will have gene status TMM.
@@ -415,10 +427,10 @@ top_labels <- t_test_results_sig3$Gene
 EnhancedVolcano(noTMM_results,
                 lab = rownames(noTMM_results),
                 x = 'logFC',
-                y = 'P.Value',
-                selectLab = top_labels,  # highlighting signature genes.
+                y = 'adj.P.Value',
+                #selectLab = top_labels,  # highlighting signature genes.
                 xlab = bquote(~Log[2]~ 'fold change'),
-                ylab = bquote(~-Log[10]~ 'P-value'),
+                ylab = bquote(~-Log[10]~ 'FDR'),
                 title = NULL,
                 subtitle = NULL,
                 pCutoff = 0.01,
@@ -435,7 +447,7 @@ EnhancedVolcano(noTMM_results,
                 legendLabels = c('Not Significant','Significant logFC','Significant P-value ','Significant P-value & LogFC'),
                 col = c('grey80', 'grey50', 'grey25', 'purple'),
                 ylim = c(0, 5),
-                caption = "Cutoffs: P <= 0.01, |Log2FC| >= 0.5"
+                caption = "Cutoffs: FDR <= 0.01, |Log2FC| >= 0.5"
 ) + theme_classic() + 
   theme(axis.title = element_text(size = 18),
         axis.text = element_text(size = 15),
