@@ -378,15 +378,12 @@ regression_results_sig2 <- regression_results2 %>%
   filter(round(Adj.P.Value, 2) <= 0.01 & round(R.Squared, 1) >= 0.3)
 regression_results_sig2 <- merge(regression_results_sig2, noTMM_candidates[, c("Gene", "Gene Status")],  by = "Gene", all.x = TRUE)
 
-##### Making volcano plot for NO_TMM vs. TMM.
-
-top_labels <- regression_results_sig2$Gene
-
+##### Making volcano plot for NO_TMM vs. ALT.
 EnhancedVolcano(noTMM_results,
                 lab = rownames(noTMM_results),
                 x = 'logFC',
                 y = 'adj.P.Val',
-                selectLab = top_labels,  # highlighting signature genes.
+               selectLab =  c("CPNE3"),  # highlighting signature genes.
                 xlab = bquote(~Log[2]~ 'fold change'),
                 ylab = bquote(~-Log[10]~ 'FDR'),
                 title = NULL,
@@ -395,14 +392,14 @@ EnhancedVolcano(noTMM_results,
                 FCcutoff = 0.5,
                 pointSize = 2.0,
                 arrowheads = FALSE,
-                max.overlaps = 17,
+                max.overlaps = 20,
                 labFace = 'bold',
                 boxedLabels = TRUE,
                 labSize = 1.0,
                 drawConnectors = TRUE,
                 widthConnectors = 0.3,
                 colAlpha = 0.8,
-                legendLabels = c('Not Significant','Significant logFC','Significant P-value ','Significant P-value & LogFC'),
+                legendLabels = NULL,
                 col = c('grey80', 'grey50', 'grey25', 'purple'),
                 ylim = c(0, 5),
                 caption = "Cutoffs: FDR <= 0.01, |Log2FC| >= 0.5"
@@ -590,14 +587,11 @@ regression_results_sig3 <- regression_results3 %>%
 regression_results_sig3 <- merge(regression_results_sig3, noTMM_candidates[, c("Gene", "Gene Status")],  by = "Gene", all.x = TRUE)
 
 ##### Making volcano plot for NO_TMM vs. TMM.
-
-top_labels <- regression_results_sig3$Gene
-
 EnhancedVolcano(noTMM_results,
                 lab = rownames(noTMM_results),
                 x = 'logFC',
                 y = 'adj.P.Val',
-                selectLab = top_labels,  # highlighting signature genes.
+                selectLab = "CPNE3",  # highlighting signature genes.
                 xlab = bquote(~Log[2]~ 'fold change'),
                 ylab = bquote(~-Log[10]~ 'FDR'),
                 title = NULL,
@@ -606,14 +600,15 @@ EnhancedVolcano(noTMM_results,
                 FCcutoff = 0.5,
                 pointSize = 2.0,
                 arrowheads = FALSE,
-                max.overlaps = 17,
+                max.overlaps = 20,
+                maxoverlapsConnectors = 10,
                 labFace = 'bold',
                 boxedLabels = TRUE,
                 labSize = 1.0,
                 drawConnectors = TRUE,
                 widthConnectors = 0.3,
                 colAlpha = 0.8,
-                legendLabels = c('Not Significant','Significant logFC','Significant P-value ','Significant P-value & LogFC'),
+                legendLabels = NULL,
                 col = c('grey80', 'grey50', 'grey25', 'purple'),
                 ylim = c(0, 5),
                 caption = "Cutoffs: FDR <= 0.01, |Log2FC| >= 0.5"
@@ -628,6 +623,7 @@ EnhancedVolcano(noTMM_results,
 
 ##### 
 candidate_genes <- intersect(regression_results_sig2$Gene, regression_results_sig3$Gene)
+
 
 # boxplots of only the candidate genes.
 

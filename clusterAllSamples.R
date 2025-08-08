@@ -150,7 +150,9 @@ plot(umap_res, col = tmm_colors[ackerman_metadata$TMM_Case], pch = 19,
 
 
 
-clusters_tmm <- as.data.frame(km_res$cluster)
+clusters_tmm <- as.matrix(km_res$cluster)
+clusters_tmm <- as.data.frame(clusters_tmm)
+
 clusters_tmm$SampleID <- rownames(clusters_tmm)
 rownames(clusters_tmm) <- NULL
 
