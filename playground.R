@@ -51,3 +51,51 @@ ggsurvplot(fit,
            surv.median.line = "hv",
            ncensor.plot = TRUE,
            ggtheme = theme_bw())
+
+
+###########################################################################################
+
+##### making cls and gct file for running in GSEA for pathway analysis.
+
+# run DataCleaning.R first.
+
+### gct file from Expression function.
+
+write_gct <- function(mat, file, gene_desc = "na") {
+  mat <- as.matrix(mat)
+  genes <- rownames(mat)
+  
+
+  con <- file(file, open = "wt")
+  on.exit(close(con), add = TRUE)
+  writeLines("#1.2", con)
+  writeLines(paste(nrow(mat), ncol(mat), sep = "\t"), con)
+  writeLines(paste(c("Name", "Description", colnames(mat)), collapse = "\t"), con)
+  
+  for (i in seq_len(nrow(mat))) {
+    line <- c(genes[i], "na", sprintf("%g", mat[i, ]))
+    writeLines(paste(line, collapse = "\t"), con)
+  }
+}
+
+write_gct(Expression, "Expression.gct")
+
+### .cls file from metadata.
+
+out_cls   <- "classes.cls"
+ 
+classes <- as.character(metadata[["TMM_Case"]])
+
+levels <- unique(classes)
+k <- length(levels)
+class_index <- match(classes, levels) - 1  # 0-based
+
+con <- file(out_cls, open = "wt")
+on.exit(close(con), add = TRUE)
+writeLines(sprintf("%d %d 1", ncol(Expression), k), con)
+writeLines(paste("#", paste(levels, collapse = " ")), con)
+writeLines(paste(class_index, collapse = " "), con)
+close(con)
+
+
+
