@@ -682,12 +682,188 @@ for (gene in rownames(regression_test_candidates)) {
 
 dev.off()
 
-#####
+######################################################################################
+
+
+### differentiating high risk and low-risk NO_TMM (samples that clustered together and samples that did not).
+
+# lets see the DGE we previously got pop up again. That would mean our signal really only differentiates high-risk from low-risk mostly.
+
+risk_NOTMM_metadata <- metadata[metadata$TMM_Case == "NO_TMM", ]
+risk_NOTMM_metadata <- risk_NOTMM_metadata[!risk_NOTMM_metadata$SampleID %in% c("TARGET.30.PALCBW.01A", "TARGET.30.PASPER.01A", "TARGET.30.PASJZC.01A", "TARGET.30.PARZIP.01A"), ]
+# those 4 high-risk samples actually clustered with other NO_TMM samples even if high-risk.
+
+risk_NOTMM_metadata <- risk_NOTMM_metadata %>%
+  mutate(COG.Risk.Group2 = case_when(
+    COG.Risk.Group == "High Risk" ~ "High Risk",
+    TRUE ~ "Low Risk"
+  ))
+
+risk_NOTMM_metadata$COG.Risk.Group2 <- as.factor(risk_NOTMM_metadata$COG.Risk.Group2)
+
+risk_NOTMM_metadata <- risk_NOTMM_metadata %>%
+  arrange(COG.Risk.Group2)
+
+Expression_risk_NOTMM <- Expression[, colnames(Expression) %in% risk_NOTMM_metadata$SampleID]
+Expression_risk_NOTMM <- Expression_risk_NOTMM[, match(risk_NOTMM_metadata$SampleID, colnames(Expression_risk_NOTMM))]
+
+
+##### 1) Doing differential gene expression using Limma for our log raw counts data. NO_TMM cluster 1 vs. cluster 2.
+
+# creating design matrix.
+
+design <- model.matrix(~ 0 + COG.Risk.Group2, data = risk_NOTMM_metadata)
+colnames(design) <- levels(risk_NOTMM_metadata$COG.Risk.Group2)
+colnames(design) <- make.names(colnames(design))
+
+
+# Estimating array weights to account for sample-specific variability in library sizes.
+weights <- arrayWeights(Expression_risk_NOTMM, design = design)
+
+# Fitting linear model using limma.
+fit <- lmFit(Expression_risk_NOTMM, design, weights = weights)
+fit <- eBayes(fit, trend = TRUE)
+
+# Contrasts: High Risk vs Low Risk.
+
+contrast.matrix <- makeContrasts(
+  HighRiskvsLowRisk = High.Risk - Low.Risk,
+  LowRiskvsHighRisk = Low.Risk - High.Risk,
+  levels = design
+)
+
+fit2 <- contrasts.fit(fit, contrast.matrix)
+fit2 <- eBayes(fit2, trend = TRUE)
+
+# top results for High Risk NO_TMM.
+HighRisk <- topTable(fit2, coef = "HighRiskvsLowRisk", number = Inf, adjust = "fdr")
+
+
+# Filtering for FDR < 0.01.
+HighRisk_candidates <- HighRisk[round(HighRisk$adj.P.Val, 2) <= 0.01 & (HighRisk$logFC >= 0.5 | HighRisk$logFC <= -0.5), ]
+
+HighRisk <- HighRisk %>%
+  mutate("Gene Status" = case_when(
+    rownames(HighRisk) %in% rownames(HighRisk) & HighRisk$logFC > 0 ~ "HighRisk",
+    rownames(HighRisk) %in% rownames(HighRisk) & noTMM_results$logFC < 0 ~ "LowRisk",
+    TRUE ~ "Not significant"))
+
+HighRisk_candidates <- HighRisk_candidates %>%
+  mutate("Gene Status" = case_when(
+    HighRisk_candidates$logFC > 0 ~ "HighRisk",
+    HighRisk_candidates$logFC < 0 ~ "LowRisk",
+    TRUE ~ "Not significant"))
 
 
 
+##### 2) t-test of the DEGs.
+# Initializing an empty data frame for storing t-test results.
+HighRisk_candidates <- rownames_to_column(HighRisk_candidates, var = "Gene")
+dge_gene <- Expression_risk_NOTMM[rownames(Expression_risk_NOTMM) %in% HighRisk_candidates$Gene, ,drop = FALSE]
+
+t_test_results <- data.frame(
+  Gene = character(),
+  p_value_t_test = numeric(),
+  stringsAsFactors = FALSE
+)
+
+# all p-values for FDR adjustment later.
+all_p_values <- numeric()
+
+# Looping through each gene in dge_gene.
+for (i in 1:nrow(HighRisk_candidates)) {
+  
+  gene_id <- HighRisk_candidates$Gene[i]
+  
+  
+  # Extracting the expression values for this gene, keeping it as a matrix. We are only selecting significant genes (all samples for this gene).
+  gene_Expression <- dge_gene[rownames(dge_gene) == gene_id, , drop = FALSE]
+  
+  # Creating C1 and C2 group. For the gene we are working with, all HighRisk sample expression data placed in c1_group and all LowRisk sample expression data placed in c2_group.
+  c1_group <- gene_Expression[, risk_NOTMM_metadata$COG.Risk.Group2 == "High Risk", drop = FALSE]
+  c2_group <- gene_Expression[, risk_NOTMM_metadata$COG.Risk.Group2 == "Low Risk", drop = FALSE]
+  
+  # for a gene, compare c1 and c2 samples.
+  t_test <- t.test(c1_group, c2_group)
+  p_value_t_test <- t_test$p.value
+  all_p_values <- c(all_p_values, p_value_t_test)
+  
+  
+  # Storing the results.
+  t_test_results <- rbind(t_test_results, data.frame(
+    Gene = gene_id,
+    p_value_t_test = p_value_t_test
+  ))
+  
+  
+  
+  # removing un-required intermediates formed while forming the t-test table above.
+  rm(gene_id)
+  rm(gene_Expression)
+  rm(c1_group)
+  rm(c2_group)
+  rm(p_value_t_test)
+  rm(t_test)
+}
+
+# Calculating the FDR-adjusted p-values
+t_test_results$fdr_t_test <- p.adjust(all_p_values, method = "BH")
 
 
+t_test_results <- merge(t_test_results, HighRisk_candidates[, c("Gene", "Gene Status")],  by = "Gene", all.x = TRUE)
 
 
+# Storing significant t-test results where FDR is less than 0.01.
+t_test_results_sig_highRisk <- t_test_results[round(t_test_results$fdr_t_test, 2) <= 0.01, ]
 
+dge_gene <-dge_gene[rownames(dge_gene) %in% t_test_results_sig_highRisk$Gene, ]
+dge_gene <- dge_gene[match(t_test_results_sig_highRisk$Gene, rownames(dge_gene)), ]
+
+##### 3) Linear regression test of candidate genes.
+regression_results <- data.frame(
+  Gene = character(),
+  estimate = numeric(),
+  p_value = numeric(),
+  R.squared = numeric(),
+  stringsAsFactors = FALSE
+)
+
+# for each gene in the candidate list, updating regression_results.
+for (gene in rownames(dge_gene)) {
+  
+  data <- data.frame(gene_Expression = as.numeric(dge_gene[gene, ]), 
+                     RiskGroup = risk_NOTMM_metadata$COG.Risk.Group2)
+  
+  # Fit linear model.
+  model <- lm(gene_Expression ~ RiskGroup, data = data)
+  summary_model <- summary(model)
+  
+  
+  # Store regression results.
+  regression_results <- rbind(regression_results, data.frame(
+    Gene = gene,
+    estimate = summary_model$coefficients[2, 1],
+    p_value = summary_model$coefficients[2, 4],
+    R.Squared = summary_model$r.squared
+  ))
+  
+  # removing intermediates.
+  rm(data)
+  rm(summary_model)
+  rm(gene)
+  rm(estimate)
+  rm(p_value)
+  rm(R.squared)
+}
+
+# adjusted p-values.
+regression_results$Adj.P.Value <- p.adjust(regression_results$p_value, method = "fdr")
+
+# Filtering for r-squared >= 0.3 & fdr <= 0.01.
+regression_results_sig_highRisk <- regression_results %>%
+  filter(round(Adj.P.Value, 2) <= 0.01 & round(R.Squared, 1) >= 0.3)
+regression_results_sig_highRisk <- merge(regression_results_sig_highRisk, HighRisk_candidates[, c("Gene", "Gene Status")],  by = "Gene", all.x = TRUE)
+
+
+##/
+regression_results_sig_highRisk[regression_results_sig_highRisk$Gene %in% candidate_genes, ]

@@ -4,6 +4,9 @@
 library(tidyverse)
 library(dplyr)
 library(ggpubr)
+library(survival)
+library(survminer)
+
 
 ExpressionTERT <- Expression["TERT", ]
 
@@ -28,3 +31,23 @@ ggplot(ExpressionTERT, aes(x = TMM_Case, y = Expression, fill = TMM_Case, color 
   stat_compare_means(comparisons = list(c("NO_TMM","TMM")), method= "t.test",
                      method.args = list(alternative ="two.sided"), size = 8, tip.length = 0.01,
                      label.y = 12)
+
+## looking at the difference between survival plot of MYCN-amplified and MYCN-not amplified NO_TMM samples.
+ackerman_metadata <- read.table(file = 'NBL_Ackerman_CompleteMeta.txt', header = TRUE, sep = '\t')
+survival_metadata <- read_delim("Metadata_TARGETFinal_08012024.txt")
+
+survival_metadata <- survival_metadata[survival_metadata$TMM_Case == "NO_TMM", ]
+survival_metadata$Vital.Status <- ifelse(survival_metadata$Vital.Status == "Dead", 1, 0)
+fit <- survfit(Surv(Event.Free.Survival.Time.in.Days, Vital.Status) ~ MYCN.status, data = survival_metadata)
+
+
+# plotting the graph.
+ggsurvplot(fit,
+           pval = TRUE,
+           conf.int = TRUE,
+           risk.table = TRUE,
+           risk.table.col = "strata",
+           linetype = "strata",
+           surv.median.line = "hv",
+           ncensor.plot = TRUE,
+           ggtheme = theme_bw())
