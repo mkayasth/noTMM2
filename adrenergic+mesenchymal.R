@@ -218,9 +218,48 @@ adr_gsva <- gsvaParam(Expression, gene_adr, kcdf = "Gaussian")
 GSVA_result_adr <- gsva(adr_gsva)
 GSVA_df_adr <- as.data.frame(GSVA_result_adr)
 GSVA_long_adr <- pivot_longer(GSVA_df_adr, cols = everything(), names_to = "SampleID", values_to = "GSVA_Score")
-GSVA_long_adr <- merge(GSVA_long_adr, metadata, by = "SampleID", all.x = TRUE)
 
 
 
+# GSVA for mesenchymal marker.
+mes_gsva <- gsvaParam(Expression, gene_mes, kcdf = "Gaussian")
+GSVA_result_mes <- gsva(mes_gsva)
+GSVA_df_mes <- as.data.frame(GSVA_result_mes)
+GSVA_long_mes <- pivot_longer(GSVA_df_mes, cols = everything(), names_to = "SampleID", values_to = "GSVA_Score")
+
+
+# putting both together.
+GSVA_long_state <- left_join(GSVA_long_adr, GSVA_long_mes, by = "SampleID")
+colnames(GSVA_long_state) <- c("SampleID", "GSVAadr", "GSVAmes")
+
+
+GSVA_long_state <- pivot_longer(
+  GSVA_long_state,
+  cols = c(GSVAadr, GSVAmes),
+  names_to = "ScoreType",
+  values_to = "Score"
+)
+
+
+# making bar graphs with GSVA scores for both markers.
+
+# Open PDF device
+pdf("GSVA_states.pdf", width = 3, height = 3)
+
+# Looping through each sample and create a plot per page
+for (sample in unique(GSVA_long_state$SampleID)) {
+  p <- ggplot(subset(GSVA_long_state, SampleID == sample),
+              aes(x = ScoreType, y = Score, fill = ScoreType)) +
+    geom_bar(stat = "identity", width = 0.5) +
+    labs(title = sample, x = NULL, y = "GSVA Score") +
+    theme_classic() +
+    theme(legend.position = "none")
+  
+  print(p)
+}
+
+
+# Close PDF device
+dev.off()
 
 
