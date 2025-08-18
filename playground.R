@@ -6,6 +6,7 @@ library(dplyr)
 library(ggpubr)
 library(survival)
 library(survminer)
+library(rstatix)
 
 
 ExpressionTERT <- Expression["TERT", ]
@@ -59,6 +60,8 @@ ggsurvplot(fit,
 
 # run DataCleaning.R first.
 
+########### First - NO_TMM vs. ALT.
+
 ### gct file from Expression function.
 
 write_gct <- function(mat, file, gene_desc = "na") {
@@ -78,24 +81,147 @@ write_gct <- function(mat, file, gene_desc = "na") {
   }
 }
 
-write_gct(Expression, "Expression.gct")
+metadata_ALT <- metadata_ALT %>%
+  arrange(TMM)
+ExpressionALT <- ExpressionALT[, match(metadata_ALT$SampleID, colnames(ExpressionALT))]
+
+write_gct(ExpressionALT, "Expression.gct")
 
 ### .cls file from metadata.
 
 out_cls   <- "classes.cls"
  
-classes <- as.character(metadata[["TMM_Case"]])
+classes <- as.character(metadata_ALT[["TMM"]])
 
 levels <- unique(classes)
 k <- length(levels)
-class_index <- match(classes, levels) - 1  # 0-based
+class_index <- match(classes, levels) - 1  # 0-based.
 
 con <- file(out_cls, open = "wt")
 on.exit(close(con), add = TRUE)
-writeLines(sprintf("%d %d 1", ncol(Expression), k), con)
+writeLines(sprintf("%d %d 1", ncol(ExpressionALT), k), con)
 writeLines(paste("#", paste(levels, collapse = " ")), con)
 writeLines(paste(class_index, collapse = " "), con)
 close(con)
+
+
+
+########### Second - NO_TMM vs. Telomerase.
+
+### gct file from Expression function.
+
+metadata_Telomerase <- metadata_Telomerase %>%
+  arrange(TMM)
+ExpressionTelomerase <- ExpressionTelomerase[, match(metadata_Telomerase$SampleID, colnames(ExpressionTelomerase))]
+
+
+write_gct(ExpressionTelomerase, "Expression2.gct")
+
+### .cls file from metadata.
+
+out_cls   <- "classes2.cls"
+
+classes <- as.character(metadata_Telomerase[["TMM"]])
+
+levels <- unique(classes)
+k <- length(levels)
+class_index <- match(classes, levels) - 1  # 0-based.
+
+con <- file(out_cls, open = "wt")
+on.exit(close(con), add = TRUE)
+writeLines(sprintf("%d %d 1", ncol(ExpressionTelomerase), k), con)
+writeLines(paste("#", paste(levels, collapse = " ")), con)
+writeLines(paste(class_index, collapse = " "), con)
+close(con)
+
+#######################################################################################
+
+## Looking at the difference between High Risk and Low Risk NO_TMM in metadata.
+source("NO_TMM/DataCleaning.R")
+
+NO_TMM_metadata <- metadata[metadata$TMM_Case == "NO_TMM", ]
+NO_TMM_metadata <- NO_TMM_metadata %>%
+  arrange(COG.Risk.Group)
+
+# removing the samples that did not follow the cluster order.
+NO_TMM_metadata <- NO_TMM_metadata[!NO_TMM_metadata$SampleID %in% c("TARGET.30.PALCBW.01A", "TARGET.30.PASPER.01A", "TARGET.30.PASJZC.01A", "TARGET.30.PARZIP.01A"), ]
+
+
+# only selecting few relevant columns from everything -- age, telomere content, c-circles, apbs, tert structural variation, tert fpkm, gender, p53-cdkn2a, alk, ras-mapk, age, survival stats, inss stage, mycn status, ploidy, histology, grade.
+NO_TMM_metadata <- NO_TMM_metadata[, colnames(NO_TMM_metadata) %in% c("SampleID", "ATRX.Status", "Telomere.Content", "C.Circles", "APBs",
+                                                                      "TERT.SV", "TERT.FPKM", "p53.CDKN2A", "RAS.MAPK", "ALK", "Gender",
+                                                                      "Age.at.Diagnosis.in.Days", "Event.Free.Survival.Time.in.Days", "Vital.Status",
+                                                                      "Overall.Survival.Time.in.Days", "First.Event", "INSS.Stage", "MYCN.status", "Ploidy", "Histology",
+                                                                      "Grade",  "COG.Risk.Group")]
+
+
+## survival graph for High vs. Intermediate vs. Low Risk NO_TMM.
+
+# OS
+NO_TMM_metadata$Vital.Status <- ifelse(NO_TMM_metadata$Vital.Status == "Dead", 1, 0)
+fit <- survfit(Surv(Overall.Survival.Time.in.Days, Vital.Status) ~ COG.Risk.Group, data = NO_TMM_metadata)
+
+
+# plotting the graph.
+ggsurvplot(fit,
+           pval = TRUE,
+           conf.int = TRUE,
+           risk.table = TRUE,
+           risk.table.col = "strata",
+           linetype = "strata",
+           surv.median.line = "hv",
+           ncensor.plot = TRUE,
+           ggtheme = theme_bw())
+
+#EFS.
+NO_TMM_metadata <- NO_TMM_metadata %>%
+  mutate(
+    EFS_event = case_when(
+      First.Event %in% c("Relapse", "Progression", "Second Malignant Neoplasm", "Death") ~ 1L,
+      First.Event %in% c("Censored") ~ 0L,
+      TRUE ~ 0L
+    )
+  )
+
+fit <- survfit(Surv(Event.Free.Survival.Time.in.Days, EFS_event) ~ COG.Risk.Group,
+                   data = NO_TMM_metadata)
+
+ggsurvplot(fit,
+  pval = TRUE,
+  conf.int = TRUE,
+  risk.table = TRUE,
+  risk.table.col = "strata",
+  surv.median.line = "hv",
+  ggtheme = theme_bw())
+
+##########################################################################################
+
+# fisher's test to see relationship between Risk Group and other metadata columns.
+
+NO_TMM_metadata2 <- NO_TMM_metadata[NO_TMM_metadata$Histology != "Unknown", ]
+table_var <- table(NO_TMM_metadata2$COG.Risk.Group, NO_TMM_metadata2$Histology)
+fisher.test(table_var)
+
+NO_TMM_metadata2 <- NO_TMM_metadata[NO_TMM_metadata$Grade != "Unknown", ]
+table_var <- table(NO_TMM_metadata2$COG.Risk.Group, NO_TMM_metadata2$Grade)
+fisher.test(table_var)
+
+NO_TMM_metadata2 <- NO_TMM_metadata[NO_TMM_metadata$Ploidy != "Unknown", ]
+table_var <- table(NO_TMM_metadata2$COG.Risk.Group, NO_TMM_metadata2$Ploidy)
+fisher.test(table_var)
+
+NO_TMM_metadata2 <- NO_TMM_metadata[NO_TMM_metadata$MYCN.status != "Unknown", ]
+table_var <- table(NO_TMM_metadata2$COG.Risk.Group, NO_TMM_metadata2$MYCN.status)
+fisher.test(table_var)
+
+NO_TMM_metadata2 <- NO_TMM_metadata[NO_TMM_metadata$INSS.Stage != "Unknown", ]
+table_var <- table(NO_TMM_metadata2$COG.Risk.Group, NO_TMM_metadata2$INSS.Stage)
+fisher.test(table_var)
+
+NO_TMM_metadata2 <- NO_TMM_metadata[NO_TMM_metadata$ALK != "N/A", ]
+table_var <- table(NO_TMM_metadata2$COG.Risk.Group, NO_TMM_metadata2$ALK)
+fisher.test(table_var)
+
 
 
 

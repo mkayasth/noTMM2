@@ -740,7 +740,7 @@ HighRisk <- topTable(fit2, coef = "HighRiskvsLowRisk", number = Inf, adjust = "f
 
 
 # Filtering for FDR < 0.01.
-HighRisk_candidates <- HighRisk[round(HighRisk$adj.P.Val, 2) <= 0.05 & (HighRisk$logFC >= 0.5 | HighRisk$logFC <= -0.5), ]
+HighRisk_candidates <- HighRisk[round(HighRisk$adj.P.Val, 2) <= 0.01 & (HighRisk$logFC >= 0.5 | HighRisk$logFC <= -0.5), ]
 
 HighRisk <- HighRisk %>%
   mutate("Gene Status" = case_when(
@@ -814,7 +814,7 @@ t_test_results <- merge(t_test_results, HighRisk_candidates[, c("Gene", "Gene St
 
 
 # Storing significant t-test results where FDR is less than 0.01.
-t_test_results_sig_highRisk <- t_test_results[round(t_test_results$fdr_t_test, 2) <= 0.05, ]
+t_test_results_sig_highRisk <- t_test_results[round(t_test_results$fdr_t_test, 2) <= 0.01, ]
 
 dge_gene <-dge_gene[rownames(dge_gene) %in% t_test_results_sig_highRisk$Gene, ]
 dge_gene <- dge_gene[match(t_test_results_sig_highRisk$Gene, rownames(dge_gene)), ]
@@ -861,7 +861,7 @@ regression_results$Adj.P.Value <- p.adjust(regression_results$p_value, method = 
 
 # Filtering for r-squared >= 0.3 & fdr <= 0.01.
 regression_results_sig_highRisk <- regression_results %>%
-  filter(round(Adj.P.Value, 2) <= 0.05)
+  filter(round(Adj.P.Value, 2) <= 0.01)
 regression_results_sig_highRisk <- merge(regression_results_sig_highRisk, HighRisk_candidates[, c("Gene", "Gene Status")],  by = "Gene", all.x = TRUE)
 
 
