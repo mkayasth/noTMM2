@@ -137,7 +137,7 @@ close(con)
 #######################################################################################
 
 ## Looking at the difference between High Risk and Low Risk NO_TMM in metadata.
-source("NO_TMM/DataCleaning.R")
+source("DataCleaning.R")
 
 NO_TMM_metadata <- metadata[metadata$TMM_Case == "NO_TMM", ]
 NO_TMM_metadata <- NO_TMM_metadata %>%

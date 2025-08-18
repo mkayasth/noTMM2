@@ -1,8 +1,10 @@
 ### run DataCleaning.R first :)
+source("DataCleaning.R")
 
 library(EnhancedVolcano)
 library(tidyverse)
 library(dplyr)
+library(ggpubr)
 
 
 ##### 1) Doing differential gene expression using Limma for our log raw counts data. NO_TMM vs. TMM.
@@ -864,9 +866,5 @@ regression_results_sig_highRisk <- regression_results %>%
   filter(round(Adj.P.Value, 2) <= 0.01)
 regression_results_sig_highRisk <- merge(regression_results_sig_highRisk, HighRisk_candidates[, c("Gene", "Gene Status")],  by = "Gene", all.x = TRUE)
 
-
-##/
-a <- regression_results_sig_highRisk[regression_results_sig_highRisk$Gene %in% candidate_genes, ]
-candidate_genes_minus <- candidate_genes[!candidate_genes %in% a$Gene]
 
 
