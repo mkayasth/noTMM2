@@ -229,8 +229,7 @@ plot(pca_var_explained * 100, type = "b", pch = 19,
 # From the elbow plot, graph seems to plateau at PC:1-5.
 pc_scores <- pca_result$x[, 1:5]
 
-##### Clustering the whole expression data with batch effects.
-
+##### Clustering the whole expression data.
 # k-means clustering.
 set.seed(123)
 umap_res <- umap(pc_scores)

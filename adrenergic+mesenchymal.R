@@ -1,4 +1,4 @@
-ssource("NO_TMM/DataCleaning.R")
+source("DataCleaning.R")
 
 ### Adrenergic markers: "PHOX2A","PHOX2B", "HAND1", "HAND2", "GATA2", "GATA3", "ISL1", "TBX2", "ASCL1", "TH", "DBH", "DLL3", "ATOH8"
 ### Mesenchymal markers: "CD44","VIM", "FN1", "TWIST2", "SNAI2", "PRRX1", "NOTCH3"
@@ -26,8 +26,8 @@ ExpressionFpkm <- ExpressionFpkm[, match(metadata$SampleID, colnames(ExpressionF
 ranked_TARGET_NBL <- apply(ExpressionFpkm, 2, function(x) rank(x, ties.method = "average"))
 
 ## only looking at the markers genes for adrenergic phenotypes first.
-ranked_TARGET_NBL_adrenergic <- ranked_TARGET_NBL[c("PHOX2A","PHOX2B", "HAND1", "HAND2", "GATA2", "GATA3", 
-                                                    "ISL1", "TBX2", "ASCL1", "TH", "DBH", "DLL3", "ATOH8"), ]
+ranked_TARGET_NBL_adrenergic <- ranked_TARGET_NBL[c("PHOX2B", "HAND2", "GATA3", 
+                                                    "ISL1", "ASCL1", "TH", "DBH"), ]
 
 ##########################################################################################
 
@@ -83,8 +83,8 @@ plot(umap_res, col = tmm_colors[metadata$TMM_Case], pch = 19,
 
 ### Now, making the cluster for mesenchymal markers.
 
-ranked_TARGET_NBL_mesenchymal <- ranked_TARGET_NBL[c("CD44","VIM", "FN1", "TWIST2", "SNAI2", "PRRX1", 
-                                                    "NOTCH3"), ]
+ranked_TARGET_NBL_mesenchymal <- ranked_TARGET_NBL[c("VIM", "FN1", "TWIST1", "SNAI2", "PRRX1", 
+                                                    "ALDH1A3"), ]
 
 # Scale and transpose first.
 pca_scale <- scale(t(ranked_TARGET_NBL_mesenchymal))
@@ -103,8 +103,8 @@ plot(pca_var_explained * 100, type = "b", pch = 19,
      ylab = "Variance Explained (%)",
      main = "Scree Plot: Full PCA")
 
-# From the elbow plot, graph seems to plateau at PC:1-4.
-pc_scores <- pca_result$x[, 1:4]
+# From the elbow plot, graph seems to plateau at PC:1-3.
+pc_scores <- pca_result$x[, 1:3]
 
 ##### Clustering the whole expression data.
 
@@ -143,9 +143,14 @@ clusters_tmm2 <- clusters_tmm2 %>%
 #########################################################################################
 
 # combining both markers together.
-ranked_TARGET_NBL_states <- ranked_TARGET_NBL[c("CD44","VIM", "FN1", "TWIST2", "SNAI2", "PRRX1", 
-                                                     "NOTCH3", "PHOX2A","PHOX2B", "HAND1", "HAND2", "GATA2", "GATA3", 
-                                                "ISL1", "TBX2", "ASCL1", "TH", "DBH", "DLL3", "ATOH8"), ]
+
+# ranked_TARGET_NBL_states <- ranked_TARGET_NBL[c("CD44","VIM", "FN1", "TWIST2", "SNAI2", "PRRX1", 
+#                                                      "NOTCH3", "PHOX2A","PHOX2B", "HAND1", "HAND2", "GATA2", "GATA3", 
+#                                                 "ISL1", "TBX2", "ASCL1", "TH", "DBH", "DLL3", "ATOH8"), ]
+
+ranked_TARGET_NBL_states <- ranked_TARGET_NBL[c("PHOX2B", "HAND2", "GATA3", 
+                                                "ISL1", "ASCL1", "TH", "DBH", "VIM", "FN1", "TWIST1", "SNAI2", "PRRX1", 
+                                                "ALDH1A3"), ]
 
 #### Now making the clusters only based on these markers genes.
 
@@ -166,8 +171,8 @@ plot(pca_var_explained * 100, type = "b", pch = 19,
      ylab = "Variance Explained (%)",
      main = "Scree Plot: Full PCA")
 
-# From the elbow plot, graph seems to plateau at PC:1-9.
-pc_scores <- pca_result$x[, 1:4]
+# From the elbow plot, graph seems to plateau at PC:1-5.
+pc_scores <- pca_result$x[, 1:5]
 
 ##### Clustering the whole expression data.
 
@@ -203,9 +208,10 @@ plot(umap_res, col = tmm_colors[metadata$TMM_Case], pch = 19,
 
 
 ### using GSVA on the log counts using these markers.
-gene_adr <- list("ADR Genes" = c("PHOX2A","PHOX2B", "HAND1", "HAND2", "GATA2", "GATA3", 
-                                 "ISL1", "TBX2", "ASCL1", "TH", "DBH", "DLL3", "ATOH8"))
-gene_mes <- list("MES Genes" = c("CD44","VIM", "FN1", "TWIST2", "SNAI2", "PRRX1", "NOTCH3"))
+gene_adr <- list("ADR Genes" = c("PHOX2B", "HAND2", "GATA3", 
+                                 "ISL1", "ASCL1", "TH", "DBH"))
+gene_mes <- list("MES Genes" = c("VIM", "FN1", "TWIST1", "SNAI2", "PRRX1", 
+                                 "ALDH1A3"))
 
 gene_combined <- list(
   "ADR Genes" = c("PHOX2A","PHOX2B", "HAND1", "HAND2", "GATA2", "GATA3", 
@@ -261,5 +267,54 @@ for (sample in unique(GSVA_long_state$SampleID)) {
 
 # Close PDF device
 dev.off()
+
+# fixing the bad column name in clusters_tmm3.
+names(clusters_tmm3)[names(clusters_tmm3) == "km_res3$cluster"] <- "km_res3_cluster"
+
+# wide GSVA
+gsva_wide <- GSVA_long_state %>%
+  pivot_wider(names_from = ScoreType, values_from = Score)
+
+# computing diffs
+gsva_wide$mes_adr <- gsva_wide$GSVAmes - gsva_wide$GSVAadr
+gsva_wide$adr_mes <- gsva_wide$GSVAadr - gsva_wide$GSVAmes
+
+# join and filter
+tmp <- merge(clusters_tmm3, gsva_wide, by = "SampleID", all.x = TRUE)
+
+results <- tmp[
+  (tmp$mes_adr >= 0.3 & tmp$km_res3_cluster == 1) |
+    (tmp$adr_mes >= 0.3 & tmp$km_res3_cluster == 2),
+]
+
+## plotting the clusters back to see if better GSVA results mean anything to the cluster.
+gsva_colors <- case_when(
+  clusters_tmm3$SampleID %in% results$SampleID[results$mes_adr > 0] ~ "darkblue",
+  clusters_tmm3$SampleID %in% results$SampleID[results$adr_mes > 0] ~ "lightblue",
+  TRUE ~ "red"
+)
+
+plot(umap_res, col = gsva_colors, pch = 19,
+     xlab = "UMAP 1", ylab = "UMAP 2", main = "k-means Clusters on UMAP")
+
+## looking at only NO_TMM/risk group samples.
+umap_res_notmm <- umap_res[rownames(umap_res)  %in% metadata$SampleID[metadata$TMM_Case == "NO_TMM"], ]
+umap_res_gsva <- umap_res[rownames(umap_res)  %in% results$SampleID, ]
+
+
+notmm_colors <- c("High Risk" = "red", "Intermediate Risk" = "green", "Low Risk" = "green")
+
+plot(umap_res, col =  notmm_colors[metadata$COG.Risk.Group], pch = 19,
+     xlab = "UMAP 1", ylab = "UMAP 2", main = "k-means Clusters on UMAP")
+
+plot(umap_res_notmm, col =  notmm_colors[metadata$COG.Risk.Group], pch = 19,
+     xlab = "UMAP 1", ylab = "UMAP 2", main = "k-means Clusters on UMAP")
+
+
+plot(umap_res_gsva, col =  notmm_colors[metadata$COG.Risk.Group], pch = 19,
+     xlab = "UMAP 1", ylab = "UMAP 2", main = "k-means Clusters on UMAP")
+
+
+
 
 
