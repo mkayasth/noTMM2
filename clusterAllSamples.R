@@ -265,3 +265,193 @@ text(umap_res[idx, 1], umap_res[idx, 2],
      pos = 3, cex = 0.7, col = "black")
 
 ### not the most distinct cluster.
+
+##########################################################################################
+
+## clustering based on the best signature from AUC-GSVA.
+
+source("DataCleaning.R")
+ExpressionFpkm <- readRDS("TARGET_GEdata_062024.RDS")
+
+
+# Data filtering: only including sample IDs from metadata present in the fpkm dataset & vice-versa.
+metadata <- metadata %>%
+  filter(SampleID %in% colnames(ExpressionFpkm))
+ExpressionFpkm <- ExpressionFpkm[, colnames(ExpressionFpkm) %in% metadata$SampleID, drop = FALSE]
+
+metadata <- metadata %>%
+  arrange(TMM)
+
+ExpressionFpkm <- ExpressionFpkm[, match(metadata$SampleID, colnames(ExpressionFpkm))]
+
+# ranking the genes in ExpressionFpkm.
+ranked_TARGET_NBL <- apply(ExpressionFpkm, 2, function(x) rank(x, ties.method = "average"))
+
+gene_list_together <- c("CPNE8", "PGM2L1", "LIFR", "CNR1", "HECW2", "CPNE3", "HOXC9", "SNX16", "IGSF10",
+                                           "PRR7", "IGLV6-57", "SAC3D1", "CCDC86", "DDN")
+
+## only looking at the DGE genes -- common in NO_TMM vs. ALT and NO_TMM vs. Telomerase.
+ranked_TARGET_NBL <- ranked_TARGET_NBL[gene_list_together, ]
+
+##########################################################################################
+
+#### Now making the clusters only based on these candidate genes.
+
+# Scale and transpose first.
+pca_scale <- scale(t(ranked_TARGET_NBL))
+
+# Run PCA
+pca_result <- prcomp(pca_scale, center = TRUE, scale. = TRUE)
+
+# plotting the visualize the variance.
+pca_var <- pca_result$sdev^2
+pca_var_explained <- pca_var / sum(pca_var)
+
+
+# Make full scree plot to identify plateau.
+plot(pca_var_explained * 100, type = "b", pch = 19,
+     xlab = "Principal Component",
+     ylab = "Variance Explained (%)",
+     main = "Scree Plot: Full PCA")
+
+# From the elbow plot, graph seems to plateau at PC:1-2.
+pc_scores <- pca_result$x[, 1:2]
+
+##### Clustering the whole expression data.
+
+# k-means clustering.
+set.seed(123)
+umap_res <- umap(pc_scores)
+
+km_res <- kmeans(umap_res, centers = 2)
+
+# Plotting with clusters.
+tmm_colors <- c("Telomerase" = "red", "ALT" = "blue", "NO_TMM" = "green")
+
+plot(umap_res, col = tmm_colors[metadata$TMM], pch = 19,
+     xlab = "UMAP 1", ylab = "UMAP 2", main = "k-means Clusters on UMAP")
+
+#######################################################################################
+
+# clustering on the expression log counts data.
+source("DataCleaning.R")
+
+
+gene_list <- c("CPNE8", "PGM2L1", "CNR1", "LIFR", "HOXC9", "SNX16", "HECW2", "ALDH3A2",
+               "THSD7A", "CPNE3", "IGSF10")
+gene_list_ <- c("PRR7", "IGLV6-57", "SAC3D1", "CCDC86", "DDN")
+gene_list_together <- c("CPNE8", "PGM2L1", "LIFR", "CNR1", "HECW2", "CPNE3", "HOXC9", "SNX16", "IGSF10",
+                        "PRR7", "IGLV6-57", "SAC3D1", "CCDC86", "DDN")
+
+## only looking at the DGE genes -- common in NO_TMM vs. ALT and NO_TMM vs. Telomerase.
+TARGET_NBL <- Expression[gene_list, ]
+
+
+##########################################################################################
+
+#### Now making the clusters only based on these candidate genes.
+
+# Scale and transpose first.
+pca_scale <- scale(t(TARGET_NBL))
+
+# Run PCA
+pca_result <- prcomp(pca_scale, center = TRUE, scale. = TRUE)
+
+# plotting the visualize the variance.
+pca_var <- pca_result$sdev^2
+pca_var_explained <- pca_var / sum(pca_var)
+
+
+# Make full scree plot to identify plateau.
+plot(pca_var_explained * 100, type = "b", pch = 19,
+     xlab = "Principal Component",
+     ylab = "Variance Explained (%)",
+     main = "Scree Plot: Full PCA")
+
+# From the elbow plot, graph seems to plateau at PC:1-4.
+pc_scores <- pca_result$x[, 1:4]
+
+##### Clustering the whole expression data.
+
+# k-means clustering.
+set.seed(123)
+umap_res <- umap(pc_scores)
+
+km_res <- kmeans(umap_res, centers = 2)
+
+# Plotting with clusters.
+tmm_colors <- c("TMM" = "red", "NO_TMM" = "green")
+
+plot(umap_res, col = tmm_colors[metadata$TMM_Case], pch = 19,
+     xlab = "UMAP 1", ylab = "UMAP 2", main = "k-means Clusters on UMAP")
+
+
+# clustering based on expression  does not really work...
+
+########################################################################################
+
+# clustering on Ackerman samples using the signature GSVA list.
+
+gct_file<- parse_gctx("Neuroblastoma_208Samples.gct")
+ackerman_NB <- gct_file@mat
+
+# Loading metadata.
+ackerman_metadata <- read.table(file = 'NBL_Ackerman_CompleteMeta.txt', header = TRUE, sep = '\t')
+
+# only including SampleID in microarray data present in metadata.
+ackerman_NB <- ackerman_NB[, colnames(ackerman_NB) %in% ackerman_metadata$SampleID]
+ackerman_metadata <- ackerman_metadata[ackerman_metadata$SampleID %in% colnames(ackerman_NB), ]
+
+ackerman_metadata <- ackerman_metadata %>%
+  arrange(TMM_Case)
+
+ackerman_NB <- ackerman_NB[, match(ackerman_metadata$SampleID, colnames(ackerman_NB))]
+
+# ranking the genes.
+ranked_ackerman_NB <- apply(ackerman_NB, 2, function(x) rank(x, ties.method = "average"))
+
+## only looking at the DGE genes -- common in NO_TMM vs. ALT and NO_TMM vs. Telomerase.
+ranked_ackerman_NB <- ranked_ackerman_NB[gene_list_together, ]
+
+#### Now making the clusters only based on these candidate genes.
+
+# Scale and transpose first.
+pca_scale <- scale(t(ranked_ackerman_NB))
+
+# Run PCA
+pca_result <- prcomp(pca_scale, center = TRUE, scale. = TRUE)
+
+# plotting the visualize the variance.
+pca_var <- pca_result$sdev^2
+pca_var_explained <- pca_var / sum(pca_var)
+
+
+# Make full scree plot to identify plateau.
+plot(pca_var_explained * 100, type = "b", pch = 19,
+     xlab = "Principal Component",
+     ylab = "Variance Explained (%)",
+     main = "Scree Plot: Full PCA")
+
+# From the elbow plot, graph seems to plateau at PC:1-4.
+pc_scores <- pca_result$x[, 1:4]
+
+##### Clustering the whole expression data.
+
+# k-means clustering.
+set.seed(123)
+umap_res <- umap(pc_scores)
+
+km_res <- kmeans(umap_res, centers = 2)
+
+# Plotting with clusters.
+tmm_colors <- c("TMM" = "red", "NO_TMM" = "green")
+
+plot(umap_res, col = tmm_colors[ackerman_metadata$TMM_Case], pch = 19,
+     xlab = "UMAP 1", ylab = "UMAP 2", main = "k-means Clusters on UMAP")
+
+
+
+
+
+
+

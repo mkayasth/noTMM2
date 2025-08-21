@@ -223,5 +223,73 @@ table_var <- table(NO_TMM_metadata2$COG.Risk.Group, NO_TMM_metadata2$ALK)
 fisher.test(table_var)
 
 
+#############################################################################################
+
+# GSVA score difference between two phenotypes using the best signature.
+
+gene_list <- list("Gene List" = c("CPNE8", "PGM2L1", "LIFR", "CNR1", "HECW2", "CPNE3", "HOXC9", "SNX16", "IGSF10"))
+gene_list_ <- list("Gene List" = c("PRR7", "IGLV6-57", "SAC3D1", "CCDC86", "DDN"))
+gene_list_together <- list("Gene List" = c("CPNE8", "PGM2L1", "LIFR", "CNR1", "HECW2", "CPNE3", "HOXC9", "SNX16", "IGSF10",
+                                           "PRR7", "IGLV6-57", "SAC3D1", "CCDC86", "DDN"))
+
+
+Expression <- as.matrix(Expression)
+gsva <- gsvaParam(Expression, gene_list, kcdf = "Gaussian")
+GSVA_result <- gsva(gsva)
+GSVA_df <- as.data.frame(GSVA_result)
+GSVA_long <- pivot_longer(GSVA_df, cols = everything(), names_to = "SampleID", values_to = "GSVA_Score")
+
+GSVA_long <- merge(GSVA_long, metadata[, c("SampleID", "TMM_Case")], by = "SampleID")
+
+gsva <- gsvaParam(Expression, gene_list_, kcdf = "Gaussian")
+GSVA_result <- gsva(gsva)
+GSVA_df <- as.data.frame(GSVA_result)
+GSVA_long_ <- pivot_longer(GSVA_df, cols = everything(), names_to = "SampleID", values_to = "GSVA_Score")
+
+GSVA_long_ <- merge(GSVA_long_, metadata[, c("SampleID", "TMM_Case")], by = "SampleID")
+
+
+# 3. Boxplot.
+ggplot(GSVA_long, aes(x = TMM_Case, y = GSVA_Score, fill = TMM_Case, color = TMM_Case)) +
+  geom_boxplot(size = 0.2, alpha = 0.5, outlier.shape = NA) +
+  geom_point(position = position_jitter(width = 0.2), size = 3) +
+  scale_fill_manual(values = c("TMM" = "lightpink2", 
+                               "NO_TMM" = "lightgreen")) +
+  scale_color_manual(values = c("TMM"="darkred", 
+                                "NO_TMM" = "darkgreen")) +
+  theme_classic() +
+  labs(x = "Class", y = "gsva Score") +
+  theme(
+    axis.text.x = element_text(vjust = 1, hjust = 1),
+    axis.title = element_text(size = 6),
+    axis.text = element_text(size = 6, face = "bold"),
+    legend.position = "none"
+  ) +
+  stat_compare_means(comparisons = list(c("TMM","NO_TMM")), method= "t.test",
+                     method.args = list(alternative ="two.sided"), size = 4, tip.length = 0.01,
+                     label.y = 1.2)
+
+ggplot(GSVA_long_, aes(x = TMM_Case, y = GSVA_Score, fill = TMM_Case, color = TMM_Case)) +
+  geom_boxplot(size = 0.2, alpha = 0.5, outlier.shape = NA) +
+  geom_point(position = position_jitter(width = 0.2), size = 3) +
+  scale_fill_manual(values = c("TMM" = "lightpink2", 
+                               "NO_TMM" = "lightgreen")) +
+  scale_color_manual(values = c("TMM"="darkred", 
+                                "NO_TMM" = "darkgreen")) +
+  theme_classic() +
+  labs(x = "Class", y = "gsva Score") +
+  theme(
+    axis.text.x = element_text(vjust = 1, hjust = 1),
+    axis.title = element_text(size = 6),
+    axis.text = element_text(size = 6, face = "bold"),
+    legend.position = "none"
+  ) +
+  stat_compare_means(comparisons = list(c("TMM","NO_TMM")), method= "t.test",
+                     method.args = list(alternative ="two.sided"), size = 4, tip.length = 0.01,
+                     label.y = 1)
+
+ 
+
+
 
 
