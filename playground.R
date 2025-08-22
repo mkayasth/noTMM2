@@ -288,8 +288,52 @@ ggplot(GSVA_long_, aes(x = TMM_Case, y = GSVA_Score, fill = TMM_Case, color = TM
                      method.args = list(alternative ="two.sided"), size = 4, tip.length = 0.01,
                      label.y = 1)
 
- 
 
+
+###################################################################################################
+
+# heatmap based on adrenergic and mesenchymal elements from single cell.
+
+library(ComplexHeatmap)
+library(grid)
+
+source("DataCleaning.R")
+
+metadata <- metadata %>%
+  arrange(TMM_Case, TMM)
+
+Expression <- Expression[, match(metadata$SampleID, colnames(Expression))]
+
+heatmap_genes <- c("PHOX2A", "KLF7", "PHOX2B", "TH", "DBH", "TBX2", "ISL1", "GATA3", "HAND2", "GATA2", "ZNF536",
+                   "CD44", "FN1", "VIM", "IRF1", "IRF2", "RUNX1", "RUNX2", "MEOX1", "MEOX2", "SIX1", "SIX4", "SOX9", "SMAD3", "WWTR1", "PRRX1")
+
+heatmap_genes <- c("KLF7", "GATA3", "HAND2", "PHOX2A", "ISL1", "HAND1", "PHOX2B", "TFAP2B", "GATA2", "SATB1", "SIX3", "EYA1", "SOX11", "DACH1", "ASCL1", "HEY1", "KLF13", "PBX3",
+                   "VIM", "FN1", "MEOX2", "ID1", "EGR3", "AEBP1", "CBFB", "IRF3", "IRF2", "IRF1", "TBX18", "MAFF", "RUNX2", "ZFP36L1", "NR3C1", "BHLHE41", "GLIS3", "RUNX1", "FOSL1", "FOSL2", "ELK4", "IFI16", "SIX4", "FLI1", "MAML2", "SMAD3", "DCAF6", "WWTR1", "SOX9", "MEF2D", "ZNF217", "PRRX1", "CREG1", "NOTCH2", "SIX1", "MEOX1")
+  
+  
+  
+expression_matrix <- t(scale(t(Expression[rownames(Expression) %in% heatmap_genes, ,drop = FALSE])))
+
+# building split vector aligned to rownames(expression_matrix).
+grp_map <- setNames(c(rep("Adrenergic", 18), rep("Mesenchymal", 36)), heatmap_genes)
+row_groups <- factor(grp_map[rownames(expression_matrix)], levels = c("Adrenergic","Mesenchymal"))
+
+ht1 <- Heatmap(
+  expression_matrix,
+  row_split = row_groups,
+  cluster_columns = TRUE,
+  cluster_rows = FALSE,
+  show_column_names = TRUE,
+  height = unit(17, "cm"),
+  width = unit(15, "cm"),
+  row_names_gp = gpar(fontsize = 8, fontface = "bold"),
+  column_names_gp = gpar(fontsize = 2),
+  column_names_rot = 45
+)
+
+pdf("adr-mesHeatmap.pdf", width = 8, height = 12)
+draw(ht1)
+dev.off()
 
 
 
