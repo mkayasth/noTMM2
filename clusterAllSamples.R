@@ -324,7 +324,7 @@ pc_scores <- pca_result$x[, 1:2]
 set.seed(123)
 umap_res <- umap(pc_scores)
 
-km_res <- kmeans(umap_res, centers = 2)
+km_res_sig <- kmeans(umap_res, centers = 2)
 
 # Plotting with clusters.
 tmm_colors <- c("Telomerase" = "red", "ALT" = "blue", "NO_TMM" = "green")
@@ -449,7 +449,7 @@ pc_scores <- pca_result$x[, 1:4]
 set.seed(123)
 umap_res <- umap(pc_scores)
 
-km_res <- kmeans(umap_res, centers = 2)
+km_res_sig2 <- kmeans(umap_res, centers = 2)
 
 # Plotting with clusters.
 tmm_colors <- c("Telomerase" = "red", "NO_TMM" = "green", "ALT" = "blue")
