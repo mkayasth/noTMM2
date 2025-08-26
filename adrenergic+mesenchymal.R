@@ -316,5 +316,309 @@ plot(umap_res_gsva, col =  notmm_colors[metadata$COG.Risk.Group], pch = 19,
 
 
 
+#######################################################################################
+
+###################################################################################################
+
+# heatmap based on adrenergic and mesenchymal elements from single cell.
+
+library(ComplexHeatmap)
+library(grid)
+
+source("DataCleaning.R")
+
+metadata <- metadata %>%
+  arrange(TMM_Case, TMM)
+
+Expression <- Expression[, match(metadata$SampleID, colnames(Expression))]
+
+# common signatures from single & bulk cell studies.
+heatmap_genes <- c("PHOX2A", "PHOX2B", "HAND2", "ISL1", "GATA3", "ASCL1", "TBX2", "DBH", "TH",
+                   "PRRX1", "RUNX1", "FOSL1", "JUN", "YAP1", "WWTR1", "MEOX1", "MEOX2", "SNAI2", "CD44", "FN1", "VIM")
+
+
+
+
+expression_matrix <- t(scale(t(Expression[rownames(Expression) %in% heatmap_genes, ,drop = FALSE])))
+
+# adding gsva as annotation.
+
+# building split vector aligned to rownames of expression matrix.
+grp_map <- setNames(c(rep("Adrenergic", 9), rep("Mesenchymal", 21)), heatmap_genes)
+row_groups <- factor(grp_map[rownames(expression_matrix)], levels = c("Adrenergic","Mesenchymal"))
+
+# Running GSVA.
+
+gene_set_list_adrenergic <-list(ADRN = c("PHOX2A", "PHOX2B", "HAND2", "ISL1", "GATA3", "ASCL1", "TBX2", "DBH", "TH"))
+gene_set_list_mesenchymal <- list(MES = c("PRRX1", "RUNX1", "FOSL1", "JUN", "YAP1", "WWTR1", "MEOX1", "MEOX2", "SNAI2", "CD44", "FN1", "VIM"))
+
+
+gsvapar <- gsvaParam(as.matrix(Expression), gene_set_list_adrenergic, kcdf = "Gaussian")
+gsva_result <- gsva(gsvapar)
+
+gsvapar2 <- gsvaParam(as.matrix(Expression), gene_set_list_mesenchymal, kcdf = "Gaussian")
+gsva_result2 <- gsva(gsvapar2)
+
+
+adr <- as.numeric(gsva_result[1, ])
+names(adr) <- colnames(gsva_result)
+
+mes <- as.numeric(gsva_result2[1, ])
+names(mes) <- colnames(gsva_result2)
+
+
+stopifnot(all(colnames(Expression) %in% names(adr)))
+stopifnot(all(colnames(Expression) %in% names(mes)))
+
+# computing clustering order first(no annotation yet).
+ht_pre <- Heatmap(
+  expression_matrix,
+  row_split         = row_groups,
+  cluster_columns   = TRUE,
+  cluster_rows      = FALSE,
+  show_column_names = TRUE,
+  row_names_gp      = gpar(fontsize = 8, fontface = "bold"),
+  column_names_gp   = gpar(fontsize = 8),
+  column_names_rot  = 45
+)
+ht_pre <- draw(ht_pre)
+
+# column order for annotation.
+co <- column_order(ht_pre)
+
+ord_idx <- if (is.list(co)) unlist(co, recursive = TRUE, use.names = FALSE) else as.integer(co)
+
+# sanity check
+stopifnot(length(ord_idx) == ncol(expression_matrix))
+stopifnot(identical(sort(ord_idx), seq_len(ncol(expression_matrix))))
+
+ord_samples <- colnames(expression_matrix)[ord_idx]
+
+# gsva annotation in the same order now.
+adr <- setNames(as.numeric(gsva_result[1, ]),  colnames(gsva_result))
+mes <- setNames(as.numeric(gsva_result2[1, ]), colnames(gsva_result2))
+
+# align to the display order
+adr_ord <- adr[ord_samples]
+mes_ord <- mes[ord_samples]
+
+
+adr_col <- ifelse(adr_ord > 0, "blue", "red")
+mes_col <- ifelse(mes_ord > 0, "blue", "red")
+
+top_anno <- HeatmapAnnotation(
+  ADR = anno_barplot(
+    adr_ord,
+    gp = gpar(fill = adr_col),
+    axis_param = list(at = c(-1, 0, 1), labels = c("-1", "0", "1"))
+  ),
+  MES = anno_barplot(
+    mes_ord,
+    gp = gpar(fill = mes_col),
+    axis_param = list(at = c(-1, 0, 1), labels = c("-1", "0", "1"))
+  ),
+  which = "column"
+)
+
+# final heatmap.
+ht_final <- Heatmap(
+  expression_matrix[, ord_samples, drop = FALSE],
+  row_split         = row_groups,
+  cluster_columns   = TRUE,             
+  cluster_rows      = FALSE,
+  show_column_names = TRUE,
+  top_annotation    = top_anno,
+  row_names_gp      = gpar(fontsize = 8, fontface = "bold"),
+  column_names_gp   = gpar(fontsize = 5),
+  column_names_rot  = 45,
+  cell_fun = function(j, i, x, y, w, h, fill) {
+    grid.rect(x, y, w, h, gp = gpar(col = "black", fill = NA, lwd = 0.25))
+  }
+)
+
+
+pdf("adr-mesHeatmap2.pdf", width = 15, height = 7)
+draw(ht_final)
+dev.off()
+
+
+###
+
+# heatmap from Thirant single cell markers.
+
+heatmap_genes <- c("KLF7", "GATA3", "HAND2", "PHOX2A", "ISL1", "HAND1", "PHOX2B", "TFAP2B", "GATA2", "SATB1", "SIX3", "EYA1", "SOX11", "DACH1", "ASCL1", "HEY1", "KLF13", "PBX3",
+                   "VIM", "FN1", "MEOX2", "ID1", "EGR3", "AEBP1", "CBFB", "IRF3", "IRF2", "IRF1", "TBX18", "MAFF", "RUNX2", "ZFP36L1", "NR3C1", "BHLHE41", "GLIS3", "RUNX1", "FOSL1", "FOSL2", "ELK4", "IFI16", "SIX4", "FLI1", "MAML2", "SMAD3", "DCAF6", "WWTR1", "SOX9", "MEF2D", "ZNF217", "PRRX1", "CREG1", "NOTCH2", "SIX1", "MEOX1")
+
+
+
+expression_matrix <- t(scale(t(Expression[rownames(Expression) %in% heatmap_genes, ,drop = FALSE])))
+
+# adding gsva as annotation.
+
+grp_map <- setNames(c(rep("Adrenergic", 18), rep("Mesenchymal", 54)), heatmap_genes)
+row_groups <- factor(grp_map[rownames(expression_matrix)], levels = c("Adrenergic","Mesenchymal"))
+
+# Running GSVA.
+gene_set_list_adrenergic <-list(ADRN = c("KLF7", "GATA3", "HAND2", "PHOX2A", "ISL1", "HAND1", "PHOX2B", "TFAP2B", "GATA2", "SATB1", "SIX3", "EYA1", "SOX11", "DACH1", "ASCL1", "HEY1", "KLF13", "PBX3"))
+gene_set_list_mesenchymal <- list(MES = c("VIM", "FN1", "MEOX2", "ID1", "EGR3", "AEBP1", "CBFB", "IRF3", "IRF2", "IRF1", "TBX18", "MAFF", "RUNX2", "ZFP36L1", "NR3C1", "BHLHE41", "GLIS3", "RUNX1", "FOSL1", "FOSL2", "ELK4", "IFI16", "SIX4", "FLI1", "MAML2", "SMAD3", "DCAF6", "WWTR1", "SOX9", "MEF2D", "ZNF217", "PRRX1", "CREG1", "NOTCH2", "SIX1", "MEOX1"))
+
+
+gsvapar <- gsvaParam(as.matrix(Expression), gene_set_list_adrenergic, kcdf = "Gaussian")
+gsva_result <- gsva(gsvapar)
+
+gsvapar2 <- gsvaParam(as.matrix(Expression), gene_set_list_mesenchymal, kcdf = "Gaussian")
+gsva_result2 <- gsva(gsvapar2)
+
+
+adr <- as.numeric(gsva_result[1, ])
+names(adr) <- colnames(gsva_result)
+
+mes <- as.numeric(gsva_result2[1, ])
+names(mes) <- colnames(gsva_result2)
+
+stopifnot(all(colnames(Expression) %in% names(adr)))
+stopifnot(all(colnames(Expression) %in% names(mes)))
+
+# computing clustering order first(no annotation yet).
+
+ht_pre <- Heatmap(
+  expression_matrix,
+  row_split         = row_groups,
+  cluster_columns   = TRUE,
+  cluster_rows      = FALSE,
+  show_column_names = TRUE,
+  row_names_gp      = gpar(fontsize = 8, fontface = "bold"),
+  column_names_gp   = gpar(fontsize = 8),
+  column_names_rot  = 45
+)
+ht_pre <- draw(ht_pre)
+
+# column order for annotation.
+co <- column_order(ht_pre)
+ord_idx <- if (is.list(co)) unlist(co, recursive = TRUE, use.names = FALSE) else as.integer(co)
+
+# sanity check
+stopifnot(length(ord_idx) == ncol(expression_matrix))
+stopifnot(identical(sort(ord_idx), seq_len(ncol(expression_matrix))))
+
+ord_samples <- colnames(expression_matrix)[ord_idx]
+
+
+adr <- setNames(as.numeric(gsva_result[1, ]),  colnames(gsva_result))
+mes <- setNames(as.numeric(gsva_result2[1, ]), colnames(gsva_result2))
+
+
+adr_ord <- adr[ord_samples]
+mes_ord <- mes[ord_samples]
+
+
+adr_col <- ifelse(adr_ord > 0, "blue", "red")
+mes_col <- ifelse(mes_ord > 0, "blue", "red")
+
+top_anno <- HeatmapAnnotation(
+  ADR = anno_barplot(
+    adr_ord,
+    gp = gpar(fill = adr_col),
+    axis_param = list(at = c(-1, 0, 1), labels = c("-1", "0", "1"))
+  ),
+  MES = anno_barplot(
+    mes_ord,
+    gp = gpar(fill = mes_col),
+    axis_param = list(at = c(-1, 0, 1), labels = c("-1", "0", "1"))
+  ),
+  which = "column"
+)
+
+
+
+# final heatmap.
+ht_final <- Heatmap(
+  expression_matrix[, ord_samples, drop = FALSE],
+  row_split         = row_groups,
+  cluster_columns   = TRUE,         
+  cluster_rows      = FALSE,
+  show_column_names = TRUE,
+  top_annotation    = top_anno,
+  row_names_gp      = gpar(fontsize = 8, fontface = "bold"),
+  column_names_gp   = gpar(fontsize = 5),
+  column_names_rot  = 45,
+  cell_fun = function(j, i, x, y, w, h, fill) {
+    grid.rect(x, y, w, h, gp = gpar(col = "black", fill = NA, lwd = 0.25))
+  })
+
+
+pdf("adr-mesHeatmap.pdf", width = 15, height = 10)
+draw(ht_final)
+dev.off()
+
+# coloring NO_TMMs.
+highlight_samples_NOTMM <- metadata$SampleID[metadata$TMM == "NO_TMM"]
+highlight_samples_ALT <- metadata$SampleID[metadata$TMM == "ALT"]
+highlight_samples_Telomerase <- metadata$SampleID[metadata$TMM == "Telomerase"]
+
+
+mat <- expression_matrix[, ord_samples, drop = FALSE]
+
+sample_colors <- setNames(rep("black", ncol(mat)), colnames(mat))
+sample_colors[highlight_samples_NOTMM]      <- "black"
+sample_colors[highlight_samples_ALT]        <- "blue"
+sample_colors[highlight_samples_Telomerase] <- "red"
+
+ht_final <- Heatmap(
+  mat,
+  name = "expr",
+  row_split         = row_groups,
+  cluster_columns   = TRUE,
+  cluster_rows      = FALSE,
+  show_column_names = TRUE,               
+  column_names_gp   =  gpar(col = sample_colors[colnames(mat)], fontsize = 5),
+  top_annotation    = top_anno,
+  row_names_gp      = gpar(fontsize = 8, fontface = "bold"),
+  cell_fun = function(j, i, x, y, w, h, fill) {
+    grid.rect(x, y, w, h, gp = gpar(col = "black", fill = NA, lwd = 0.25))
+  }
+)
+
+pdf("adr-mesHeatmap-TMM.pdf", width = 15, height = 10)
+draw(ht_final)
+dev.off()
+
+# coloring based on risk groups.
+highlight_samples_highRisk <- metadata$SampleID[metadata$COG.Risk.Group == "High Risk"]
+highlight_samples_intermediate <- metadata$SampleID[metadata$COG.Risk.Group == "Intermediate Risk"]
+highlight_samples_lowRisk <- metadata$SampleID[metadata$COG.Risk.Group == "Low Risk"]
+
+
+mat <- expression_matrix[, ord_samples, drop = FALSE]
+
+sample_colors <- setNames(rep("black", ncol(mat)), colnames(mat))
+sample_colors[highlight_samples_highRisk]      <- "red"
+sample_colors[highlight_samples_intermediate]        <- "blue"
+sample_colors[highlight_samples_lowRisk] <- "black"
+
+ht_final <- Heatmap(
+  mat,
+  name = "expr",
+  row_split         = row_groups,
+  cluster_columns   = TRUE,
+  cluster_rows      = FALSE,
+  show_column_names = TRUE,               
+  column_names_gp   =  gpar(col = sample_colors[colnames(mat)], fontsize = 5),
+  top_annotation    = top_anno,
+  row_names_gp      = gpar(fontsize = 8, fontface = "bold"),
+  cell_fun = function(j, i, x, y, w, h, fill) {
+    grid.rect(x, y, w, h, gp = gpar(col = "black", fill = NA, lwd = 0.25))
+  }
+)
+
+pdf("adr-mesHeatmap-RiskGroup.pdf", width = 15, height = 10)
+draw(ht_final)
+dev.off()
+
+
+
+
+
+
 
 

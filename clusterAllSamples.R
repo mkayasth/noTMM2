@@ -290,6 +290,7 @@ ranked_TARGET_NBL <- apply(ExpressionFpkm, 2, function(x) rank(x, ties.method = 
 gene_list_together <- c("CPNE8", "PGM2L1", "LIFR", "CNR1", "HECW2", "CPNE3", "HOXC9", "SNX16", "IGSF10",
                                            "PRR7", "IGLV6-57", "SAC3D1", "CCDC86", "DDN")
 
+
 ## only looking at the DGE genes -- common in NO_TMM vs. ALT and NO_TMM vs. Telomerase.
 ranked_TARGET_NBL <- ranked_TARGET_NBL[gene_list_together, ]
 
@@ -331,6 +332,13 @@ tmm_colors <- c("Telomerase" = "red", "ALT" = "blue", "NO_TMM" = "green")
 plot(umap_res, col = tmm_colors[metadata$TMM], pch = 19,
      xlab = "UMAP 1", ylab = "UMAP 2", main = "k-means Clusters on UMAP")
 
+
+noTMM_idx <- which(metadata$TMM == "NO_TMM" & metadata$COG.Risk.Group == "High Risk")
+
+text(umap_res[noTMM_idx, 1], umap_res[noTMM_idx, 2], 
+     labels = metadata$SampleID[noTMM_idx], 
+     pos = 3, cex = 0.7, col = "black")
+
 #######################################################################################
 
 # clustering on the expression log counts data.
@@ -344,7 +352,7 @@ gene_list_together <- c("CPNE8", "PGM2L1", "LIFR", "CNR1", "HECW2", "CPNE3", "HO
                         "PRR7", "IGLV6-57", "SAC3D1", "CCDC86", "DDN")
 
 ## only looking at the DGE genes -- common in NO_TMM vs. ALT and NO_TMM vs. Telomerase.
-TARGET_NBL <- Expression[gene_list, ]
+TARGET_NBL <- Expression[gene_list_together, ]
 
 
 ##########################################################################################
@@ -444,10 +452,17 @@ umap_res <- umap(pc_scores)
 km_res <- kmeans(umap_res, centers = 2)
 
 # Plotting with clusters.
-tmm_colors <- c("TMM" = "red", "NO_TMM" = "green")
+tmm_colors <- c("Telomerase" = "red", "NO_TMM" = "green", "ALT" = "blue")
 
-plot(umap_res, col = tmm_colors[ackerman_metadata$TMM_Case], pch = 19,
+plot(umap_res, col = tmm_colors[ackerman_metadata$TMM_Category], pch = 19,
      xlab = "UMAP 1", ylab = "UMAP 2", main = "k-means Clusters on UMAP")
+
+noTMM_idx <- which(ackerman_metadata$TMM_Case == "NO_TMM" & ackerman_metadata$Risk == "YES")
+
+text(umap_res[noTMM_idx, 1], umap_res[noTMM_idx, 2], 
+     labels = metadata$SampleID[noTMM_idx], 
+     pos = 3, cex = 0.7, col = "black")
+
 
 
 
