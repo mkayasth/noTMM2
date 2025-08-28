@@ -334,11 +334,11 @@ Expression <- Expression[, match(metadata$SampleID, colnames(Expression))]
 
 # common signatures from single & bulk cell studies.
 heatmap_genes <- c("PHOX2A", "PHOX2B", "HAND2", "ISL1", "GATA3", "ASCL1", "TBX2", "DBH", "TH",
-                   "PRRX1", "RUNX1", "FOSL1", "JUN", "YAP1", "WWTR1", "MEOX1", "MEOX2", "SNAI2", "CD44", "FN1", "VIM")
+                  "PRRX1", "RUNX1", "FOSL1", "JUN", "YAP1", "WWTR1", "MEOX1", "MEOX2", "SNAI2", "CD44", "FN1", "VIM")
 
-
-
-
+  
+  
+  
 expression_matrix <- t(scale(t(Expression[rownames(Expression) %in% heatmap_genes, ,drop = FALSE])))
 
 # adding gsva as annotation.
@@ -447,7 +447,7 @@ dev.off()
 # heatmap from Thirant single cell markers.
 
 heatmap_genes <- c("KLF7", "GATA3", "HAND2", "PHOX2A", "ISL1", "HAND1", "PHOX2B", "TFAP2B", "GATA2", "SATB1", "SIX3", "EYA1", "SOX11", "DACH1", "ASCL1", "HEY1", "KLF13", "PBX3",
-                   "VIM", "FN1", "MEOX2", "ID1", "EGR3", "AEBP1", "CBFB", "IRF3", "IRF2", "IRF1", "TBX18", "MAFF", "RUNX2", "ZFP36L1", "NR3C1", "BHLHE41", "GLIS3", "RUNX1", "FOSL1", "FOSL2", "ELK4", "IFI16", "SIX4", "FLI1", "MAML2", "SMAD3", "DCAF6", "WWTR1", "SOX9", "MEF2D", "ZNF217", "PRRX1", "CREG1", "NOTCH2", "SIX1", "MEOX1")
+                  "VIM", "FN1", "MEOX2", "ID1", "EGR3", "AEBP1", "CBFB", "IRF3", "IRF2", "IRF1", "TBX18", "MAFF", "RUNX2", "ZFP36L1", "NR3C1", "BHLHE41", "GLIS3", "RUNX1", "FOSL1", "FOSL2", "ELK4", "IFI16", "SIX4", "FLI1", "MAML2", "SMAD3", "DCAF6", "WWTR1", "SOX9", "MEF2D", "ZNF217", "PRRX1", "CREG1", "NOTCH2", "SIX1", "MEOX1")
 
 
 
@@ -614,6 +614,102 @@ ht_final <- Heatmap(
 pdf("adr-mesHeatmap-RiskGroup.pdf", width = 15, height = 10)
 draw(ht_final)
 dev.off()
+
+#################################################################################
+
+
+# heatmap using only the genes with association with TERT/extend. // from playground.R.
+
+mes_genes <- list(MES = c("NR3C1", "CBFB", "GLIS3", "IRF2" , "CD44", "DCAF6", "MAML2", "RUNX2", "WWTR1",  
+              "YAP1", "IRF1", "VIM", "ZFP36L1", "BHLHE41",
+              "GLIS3",  "CBFB"  , "FLI1", "MEF2D", "RUNX1", "CREG1", "JUN", 
+              "NOTCH2", "TBX18", "FOSL2", "MEOX1", "IFI16", "PRRX1" , "MEOX2", "SNAI2",
+            "EGR3", "MAFF", "ZNF217", "FN1", "FOSL1", "ELK4", "ID1", "AEBP1"))
+
+expression_matrix <- t(scale(t(Expression[rownames(Expression) %in% unlist(mes_genes), ,drop = FALSE])))
+
+
+gsvapar <- gsvaParam(as.matrix(Expression), mes_genes, kcdf = "Gaussian")
+gsva_result <- gsva(gsvapar)
+
+mes <- as.numeric(gsva_result[1, ])
+names(mes) <- colnames(gsva_result)
+
+# computing clustering order first(no annotation yet).
+
+ht_pre <- Heatmap(
+  expression_matrix,
+  row_order = rownames(expression_matrix),
+  cluster_columns   = TRUE,
+  cluster_rows      = FALSE,
+  show_column_names = TRUE,
+  row_names_gp      = gpar(fontsize = 8, fontface = "bold"),
+  column_names_gp   = gpar(fontsize = 8),
+  column_names_rot  = 45
+)
+ht_pre <- draw(ht_pre)
+
+# column order for annotation.
+co <- column_order(ht_pre)
+ord_idx <- if (is.list(co)) unlist(co, recursive = TRUE, use.names = FALSE) else as.integer(co)
+
+# sanity check
+stopifnot(length(ord_idx) == ncol(expression_matrix))
+stopifnot(identical(sort(ord_idx), seq_len(ncol(expression_matrix))))
+
+ord_samples <- colnames(expression_matrix)[ord_idx]
+
+mes <- setNames(as.numeric(gsva_result[1, ]), colnames(gsva_result))
+
+mes_ord <- mes[ord_samples]
+
+
+
+mes_col <- ifelse(mes_ord > 0, "blue", "red")
+
+top_anno <- HeatmapAnnotation(
+  
+  MES = anno_barplot(
+    mes_ord,
+    gp = gpar(fill = mes_col),
+    axis_param = list(at = c(-1, 0, 1), labels = c("-1", "0", "1"))
+  ),
+  which = "column"
+)
+
+# coloring NO_TMMs.
+highlight_samples_NOTMM <- metadata$SampleID[metadata$TMM == "NO_TMM"]
+highlight_samples_ALT <- metadata$SampleID[metadata$TMM == "ALT"]
+highlight_samples_Telomerase <- metadata$SampleID[metadata$TMM == "Telomerase"]
+
+
+mat <- expression_matrix[, ord_samples, drop = FALSE]
+
+sample_colors <- setNames(rep("black", ncol(mat)), colnames(mat))
+sample_colors[highlight_samples_NOTMM]      <- "black"
+sample_colors[highlight_samples_ALT]        <- "blue"
+sample_colors[highlight_samples_Telomerase] <- "red"
+
+# final heatmap.
+ht_final <- Heatmap(
+  expression_matrix[, ord_samples, drop = FALSE],
+  row_order = rownames(expression_matrix),
+  cluster_columns   = TRUE,         
+  cluster_rows      = FALSE,
+  show_column_names = TRUE,
+  top_annotation    = top_anno,
+  row_names_gp      = gpar(fontsize = 8, fontface = "bold"),
+  column_names_gp   =  gpar(col = sample_colors[colnames(mat)], fontsize = 5),
+  column_names_rot  = 45,
+  cell_fun = function(j, i, x, y, w, h, fill) {
+    grid.rect(x, y, w, h, gp = gpar(col = "black", fill = NA, lwd = 0.25))
+  })
+
+
+pdf("mesHeatmap.pdf", width = 15, height = 10)
+draw(ht_final)
+dev.off()# computing clustering order first(no annotation yet).
+
 
 
 
