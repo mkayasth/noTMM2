@@ -618,13 +618,12 @@ dev.off()
 #################################################################################
 
 
-# heatmap using only the genes with association with TERT/extend. // from playground.R.
+# heatmap using only the genes with association with extend [fdr < 0.01]. // from playground.R.
 
-mes_genes <- list(MES = c("NR3C1", "CBFB", "GLIS3", "IRF2" , "CD44", "DCAF6", "MAML2", "RUNX2", "WWTR1",  
-              "YAP1", "IRF1", "VIM", "ZFP36L1", "BHLHE41",
-              "GLIS3",  "CBFB"  , "FLI1", "MEF2D", "RUNX1", "CREG1", "JUN", 
-              "NOTCH2", "TBX18", "FOSL2", "MEOX1", "IFI16", "PRRX1" , "MEOX2", "SNAI2",
-            "EGR3", "MAFF", "ZNF217", "FN1", "FOSL1", "ELK4", "ID1", "AEBP1"))
+mes_genes <- list(MES = c("NR3C1", "DCAF6", "GLIS3", "IRF2" , "RUNX2", "YAP1","WWTR1",  
+              "CD44", "VIM", "MAML2", "BHLHE41",
+              "ZFP36L1",  "CBFB"  , "FLI1", "IRF1", "RUNX1", "TBX18", "MEF2D", 
+              "MEOX1", "NOTCH2", "CREG1", "PRRX1", "JUN", "FOSL2" , "MEOX2"))
 
 expression_matrix <- t(scale(t(Expression[rownames(Expression) %in% unlist(mes_genes), ,drop = FALSE])))
 
@@ -708,10 +707,113 @@ ht_final <- Heatmap(
 
 pdf("mesHeatmap.pdf", width = 15, height = 10)
 draw(ht_final)
-dev.off()# computing clustering order first(no annotation yet).
+dev.off()
 
 
+### from the heatmap of just extend associated MES signatures, some samples are still MES and telomerase. Doing t-test in their difference of TERT rank & EXTEND Scores.
 
+mes <- as.data.frame(mes)
+
+c1_samples <- rownames(mes)[rownames(mes) %in% metadata$SampleID[metadata$TMM == "Telomerase"] & mes$mes > 0] # MES samples for some reason.
+c2_samples <- rownames(mes)[rownames(mes) %in% metadata$SampleID[metadata$TMM == "Telomerase"] & mes$mes < 0] # telomerase and not mes.
+
+
+##### first TERT rank comparison.
+
+ExpressionFpkm <- readRDS("TARGET_GEdata_062024.RDS")
+
+
+# Data filtering: only including sample IDs from metadata present in the fpkm dataset & vice-versa.
+metadata <- metadata %>%
+  filter(SampleID %in% colnames(ExpressionFpkm))
+ExpressionFpkm <- ExpressionFpkm[, colnames(ExpressionFpkm) %in% metadata$SampleID, drop = FALSE]
+
+metadata <- metadata %>%
+  arrange(TMM)
+
+ExpressionFpkm <- ExpressionFpkm[, match(metadata$SampleID, colnames(ExpressionFpkm))]
+
+# ranking the genes in ExpressionFpkm.
+ranked_TARGET_NBL <- apply(ExpressionFpkm, 2, function(x) rank(x, ties.method = "average"))
+
+# transpose so samples are rows and genes are columns.
+t_NBL <- t(ranked_TARGET_NBL)
+t_NBL <- as.data.frame(t_NBL)
+
+# Extracting TERT ranks for each group
+tert_c1 <- t_NBL[c1_samples, "TERT"]
+tert_c2 <- t_NBL[c2_samples, "TERT"]
+
+# Running two-sample t-test.
+tert_ttest <- t.test(tert_c1, tert_c2)
+
+# making a boxplot.
+
+plot_data <- data.frame(
+  Rank = c(tert_c1, tert_c2),
+  Group = c(rep("MES", length(tert_c1)), rep("Not-MES", length(tert_c2)))
+)
+
+# Boxplot with jittered points
+ggplot(plot_data, aes(x = Group, y = Rank, fill = Group, color = Group)) +
+  geom_boxplot(outlier.shape = NA, alpha = 0.5, size = 0.2) +
+  geom_point(position = position_jitter(width = 0.2), size = 3) +
+  scale_fill_manual(values = c("MES" = "lightpink2", 
+                               "Not-MES" = "lightgreen")) +
+  scale_color_manual(values = c("MES"="darkred", 
+                                "Not-MES" = "darkgreen")) +
+  labs(title = "TERT Rank Comparison",
+       x = "Groups",
+       y = "TERT Rank") +
+  theme_classic() +
+  theme(
+    axis.text.x = element_text(vjust = 1, hjust = 1),
+    axis.title = element_text(size = 18),
+    axis.text = element_text(size = 14, face = "bold"),
+    legend.position = "none"
+  ) +
+  stat_compare_means(comparisons = list(c("MES","Not-MES")), method= "t.test",
+                     method.args = list(alternative ="two.sided"), size = 6, tip.length = 0.01,
+                     label.y = 33000)
+
+
+##### Now, EXTEND score comparison.
+
+# extend score for each group.
+extend_c1 <- telomeraseScores[c1_samples, "NormEXTENDScores"]
+extend_c2 <- telomeraseScores[c2_samples, "NormEXTENDScores"]
+
+# making a boxplot.
+
+plot_data <- data.frame(
+  Rank = c(extend_c1, extend_c2),
+  Group = c(rep("MES", length(extend_c1)), rep("Not-MES", length(extend_c2)))
+)
+
+# Boxplot with jittered points
+ggplot(plot_data, aes(x = Group, y = Rank, fill = Group, color = Group)) +
+  geom_boxplot(outlier.shape = NA, alpha = 0.5, size = 0.2) +
+  geom_point(position = position_jitter(width = 0.2), size = 3) +
+  scale_fill_manual(values = c("MES" = "lightpink2", 
+                               "Not-MES" = "lightgreen")) +
+  scale_color_manual(values = c("MES"="darkred", 
+                                "Not-MES" = "darkgreen")) +
+  labs(title = "EXTEND Scores Comparison",
+       x = "Groups",
+       y = "EXTEND Score") +
+  theme_classic() +
+  theme(
+    axis.text.x = element_text(vjust = 1, hjust = 1),
+    axis.title = element_text(size = 18),
+    axis.text = element_text(size = 14, face = "bold"),
+    legend.position = "none"
+  ) +
+  stat_compare_means(comparisons = list(c("MES","Not-MES")), method= "t.test",
+                     method.args = list(alternative ="two.sided"), size = 6, tip.length = 0.01,
+                     label.y = 1.2)
+
+
+########################################################################################################################
 
 
 

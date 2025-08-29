@@ -491,7 +491,7 @@ cor_results_adr <- cor_results_adr %>%
 
 # filtering fdr < 0.05.
 tert_correlated_genes_adr <- cor_results_adr %>%
-  filter(FDR <= 0.05) %>%
+  filter(FDR <= 0.01) %>%
   arrange(desc(correlation))
 
 #####
@@ -525,7 +525,7 @@ cor_results_mes <-  cor_results_mes %>%
 
 # filtering fdr < 0.05.
 tert_correlated_genes_mes <- cor_results_mes %>%
-  filter(FDR <= 0.05) %>%
+  filter(FDR <= 0.01) %>%
   arrange(correlation)
 
 ##################################################################################
@@ -581,7 +581,7 @@ cor_results <- cor_results %>%
 
 # filtering fdr < 0.05.
 tert_correlated_genes <- cor_results %>%
-  filter(FDR <= 0.05) %>%
+  filter(FDR <= 0.01) %>%
   arrange(correlation)
 
 ## So, TERT is negatively associated with mesenchymal characteristics. what is up with heatmap? ::)
@@ -598,6 +598,9 @@ mes <- mes[rownames(t_NBL), ,drop = FALSE]
 corr_tert_mes <- cor.test(tert_expr, mes$mes, method = "spearman")
 
 
+
+
+###########################################################################################################################################
 # correlation between GSVA of NO_TMM signatures and mesenchymal/adrenergic genes.
 
 # source("aucGSVA.R")
@@ -648,7 +651,7 @@ cor_results_adr <- cor_results_adr %>%
 
 # filtering fdr < 0.05.
 notmm_correlated_genes_adr <- cor_results_adr %>%
-  filter(FDR <= 0.05) %>%
+  filter(FDR <= 0.01) %>%
   arrange(desc(correlation))
 
 ###
