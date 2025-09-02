@@ -19,7 +19,7 @@ metadata <- read_delim("Metadata_TARGETFinal_08012024.txt")
 Expression$Ensembl_ID <- gsub("\\..*", "", Expression$Ensembl_ID)
 
 # filtering for protein coding genes (not done).
-mart <- useEnsembl("ensembl", dataset = "hsapiens_gene_ensembl", version = 114)
+mart <- useEnsembl("ensembl", dataset = "hsapiens_gene_ensembl")
 protein_coding_genes <- getBM(attributes = c("ensembl_gene_id", "gene_biotype", "hgnc_symbol"),
                               filters="biotype",
                               values = "protein_coding",
