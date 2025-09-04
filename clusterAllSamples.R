@@ -465,6 +465,100 @@ text(umap_res[noTMM_idx, 1], umap_res[noTMM_idx, 2],
 
 
 
+###################################################################################
+
+# clustering samples based on MES markers -- divide samples hopefully into MES, ADR and intermediate samples.
+ExpressionFpkm <- readRDS("TARGET_GEdata_062024.RDS")
+
+
+# Data filtering: only including sample IDs from metadata present in the fpkm dataset & vice-versa.
+metadata <- metadata %>%
+  filter(SampleID %in% colnames(ExpressionFpkm))
+ExpressionFpkm <- ExpressionFpkm[, colnames(ExpressionFpkm) %in% metadata$SampleID, drop = FALSE]
+
+metadata <- metadata %>%
+  arrange(TMM)
+
+ExpressionFpkm <- ExpressionFpkm[, match(metadata$SampleID, colnames(ExpressionFpkm))]
+
+
+# ranking the genes in ExpressionFpkm.
+ranked_TARGET_NBL <- apply(ExpressionFpkm, 2, function(x) rank(x, ties.method = "average"))
+
+mes_genes <- c("MEOX1", "WWTR1", "VIM", "CD44", "CBFB", "FOSL2", "MEOX2", "GLIS3", "TBX18", "NR3C1",
+                          "PRRX1", "MEF2D", "BHLHE41", "RUNX2", "IRF1", "NOTCH2", "YAP1", "CREG1", "DCAF6", "FLI1",
+                          "RUNX1", "IRF2", "JUN", "MAML2", "ZFP36L1")
+
+## only looking at the MES markers correlated with EXTEND scores.
+ranked_TARGET_NBL <- ranked_TARGET_NBL[mes_genes, ]
+
+
+##########################################################################################
+
+#### Now making the clusters only based on these candidate genes.
+
+# Scale and transpose first.
+pca_scale <- scale(t(ranked_TARGET_NBL))
+
+# Run PCA
+pca_result <- prcomp(pca_scale, center = TRUE, scale. = TRUE)
+
+# plotting the visualize the variance.
+pca_var <- pca_result$sdev^2
+pca_var_explained <- pca_var / sum(pca_var)
+
+
+# Make full scree plot to identify plateau.
+plot(pca_var_explained * 100, type = "b", pch = 19,
+     xlab = "Principal Component",
+     ylab = "Variance Explained (%)",
+     main = "Scree Plot: Full PCA")
+
+# From the elbow plot, graph seems to plateau at PC:1-5.
+pc_scores <- pca_result$x[, 1:5]
+
+##### Clustering the whole expression data.
+
+# k-means clustering.
+set.seed(123)
+umap_res <- umap(pc_scores)
+
+km_res <- kmeans(umap_res, centers = 3)
+
+# Plotting with clusters.
+c2_samples <- c("TARGET.30.PALUYS.01A", "TARGET.30.PALEVG.01A", "TARGET.30.PATFCY.01A", "TARGET.30.PASVRU.01A", "TARGET.30.PAPBGH.01A", "TARGET.30.PAMZMG.01A",
+                  "TARGET.30.PATFXV.01A", "TARGET.30.PASNZU.01A", "TARGET.30.PANNMS.01A", "TARGET.30.PAPTFZ.01A", "TARGET.30.PASXRG.01A", "TARGET.30.PARAMT.01A",
+                 "TARGET.30.PALZZV.01A", "TARGET.30.PATDWN.01A", "TARGET.30.PASUCB.01A", "TARGET.30.PATINJ.01A", "TARGET.30.PASXGP.01A", "TARGET.30.PAPLSD.01A",
+                 "TARGET.30.PATESI.01A", "TARGET.30.PATBMM.01A", "TARGET.30.PAMNLH.01A", "TARGET.30.PASEGA.01A", "TARGET.30.PAPBZI.01A", "TARGET.30.PAMEZH.01A",
+                 "TARGET.30.PARGKK.01A", "TARGET.30.PASWYR.01A", "TARGET.30.PALIIN.01A","TARGET.30.PAPCTS.01A", "TARGET.30.PANYGR.01A", "TARGET.30.PASWFB.01A",
+                 "TARGET.30.PATEPF.01A", "TARGET.30.PANWRR.01A", "TARGET.30.PAMMXF.01A", "TARGET.30.PARDIW.01A", "TARGET.30.PASHFA.01A", "TARGET.30.PASUYG.01A",
+                 "TARGET.30.PASXIE.01A", "TARGET.30.PASNEF.01A")
+
+c1_samples <- c("TARGET.30.PASFGG.01A", "TARGET.30.PAIVHE.01A", "TARGET.30.PAPEFE.01A", "TARGET.30.PASXRJ.01A", "TARGET.30.PASSRN.01A", "TARGET.30.PASZPI.01A",
+               "TARGET.30.PALKUC.01A", "TARGET.30.PASTKC.01A", "TARGET.30.PASMJG.01A", "TARGET.30.PANJLH.01A", "TARGET.30.PALBFW.01A", "TARGET.30.PANKFE.01A",
+               "TARGET.30.PARACM.01A", "TARGET.30.PAPUWY.01A", "TARGET.30.PATDXC.01A", "TARGET.30.PANBMJ.01A", "TARGET.30.PAIPGU.01A", "TARGET.30.PASGAP.01A",
+                 "TARGET.30.PASGAP.02A", "TARGET.30.PAPKWN.01A", "TARGET.30.PAPTLV.01A", "TARGET.30.PARSBI.01A", "TARGET.30.PALWVJ.01A", "TARGET.30.PAPZYP.01A",
+                "TARGET.30.PAPVXS.01A", "TARGET.30.PAMZGT.01A", "TARGET.30.PAKYZS.01A", "TARGET.30.PAMYCE.01A", "TARGET.30.PAPBJE.01A")
+
+colors <- rep("gray", nrow(umap_res))
+
+# Color samples
+colors[rownames(umap_res) %in% c1] <- "blue"
+colors[rownames(umap_res) %in% c2] <- "red"
+
+# Plot UMAP with colors
+plot(umap_res, col = colors, pch = 19,
+     xlab = "UMAP 1", ylab = "UMAP 2",
+     main = "k-means Clusters on UMAP")
+
+
+
+
+
+
+
+
+
 
 
 

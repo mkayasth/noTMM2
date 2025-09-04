@@ -429,6 +429,97 @@ text(umap_res[noTMM_idx, 1], umap_res[noTMM_idx, 2],
 #######################################################################################
 
 
+# looking at extend -- how good it is in differentiating telomerase and non-telomerase samples in TARGET and Ackerman.
+
+
+# first TARGET sample.
+source("DataCleaning.R")
+
+extendScores <- RunEXTEND(as.matrix(Expression))
+
+telomeraseScores <- read_delim("TelomeraseScores.txt")
+
+telomeraseScores <- telomeraseScores[, c("SampleID", "NormEXTENDScores")]
+telomeraseScores <- as.data.frame(telomeraseScores)
+telomeraseScores <- left_join(telomeraseScores, metadata[, c("SampleID", "TMM")], by = "SampleID")
+
+## boxplot showing the difference.
+ggplot(telomeraseScores, aes(x = TMM, y = NormEXTENDScores, fill = TMM, color = TMM)) +
+  geom_boxplot(size = 0.2, alpha = 0.5, outlier.shape = NA) +
+  geom_point(position = position_jitter(width = 0.2), size = 3) +
+  scale_fill_manual(values = c("Telomerase" = "lightpink2", 
+                               "NO_TMM" = "lightgreen",
+                               "ALT" = "blue")) +
+  scale_color_manual(values = c("Telomerase"="darkred", 
+                                "NO_TMM" = "darkgreen",
+                                "ALT" = "darkblue")) +
+  theme_classic() +
+  labs(x = "Class", y = "Normalized EXTEND Score") +
+  theme(
+    axis.text.x = element_text(vjust = 1, hjust = 1),
+    axis.title = element_text(size = 18),
+    axis.text = element_text(size = 12, face = "bold"),
+    legend.position = "none"
+  ) +
+  stat_compare_means(comparisons = list(c("Telomerase","NO_TMM")), method= "t.test",
+                     method.args = list(alternative ="two.sided"), size = 6, tip.length = 0.01,
+                     label.y = 1.2) +
+  stat_compare_means(comparisons = list(c("Telomerase","ALT")), method= "t.test",
+                     method.args = list(alternative ="two.sided"), size = 6, tip.length = 0.01,
+                     label.y = 1.4)
+
+
+## now, ackerman sample.
+
+gct_file <- parse_gctx("Neuroblastoma_208Samples.gct")
+ackerman_NB <- gct_file@mat
+
+# Loading metadata.
+ackerman_metadata <- read.table(file = 'NBL_Ackerman_CompleteMeta.txt', header = TRUE, sep = '\t')
+
+# only including SampleID in microarray data present in metadata.
+ackerman_NB <- ackerman_NB[, colnames(ackerman_NB) %in% ackerman_metadata$SampleID]
+ackerman_metadata <- ackerman_metadata[ackerman_metadata$SampleID %in% colnames(ackerman_NB), ]
+
+ackerman_metadata <- ackerman_metadata %>%
+  arrange(TMM_Case)
+
+ackerman_NB <- ackerman_NB[, match(ackerman_metadata$SampleID, colnames(ackerman_NB))]
+
+extendScores <- RunEXTEND(as.matrix(ackerman_NB))
+
+telomeraseScores <- read_delim("TelomeraseScores.txt")
+
+telomeraseScores <- telomeraseScores[, c("SampleID", "NormEXTENDScores")]
+telomeraseScores <- as.data.frame(telomeraseScores)
+telomeraseScores <- left_join(telomeraseScores, ackerman_metadata[, c("SampleID", "TMM_Category")], by = "SampleID")
+
+## boxplot showing the difference.
+ggplot(telomeraseScores, aes(x = TMM_Category, y = NormEXTENDScores, fill = TMM_Category, color = TMM_Category)) +
+  geom_boxplot(size = 0.2, alpha = 0.5, outlier.shape = NA) +
+  geom_point(position = position_jitter(width = 0.2), size = 3) +
+  scale_fill_manual(values = c("Telomerase" = "lightpink2", 
+                               "NO_TMM" = "lightgreen",
+                               "ALT" = "blue")) +
+  scale_color_manual(values = c("Telomerase"="darkred", 
+                                "NO_TMM" = "darkgreen",
+                                "ALT" = "darkblue")) +
+  theme_classic() +
+  labs(x = "Class", y = "Normalized EXTEND Score") +
+  theme(
+    axis.text.x = element_text(vjust = 1, hjust = 1),
+    axis.title = element_text(size = 18),
+    axis.text = element_text(size = 12, face = "bold"),
+    legend.position = "none"
+  ) +
+  stat_compare_means(comparisons = list(c("Telomerase","NO_TMM")), method= "t.test",
+                     method.args = list(alternative ="two.sided"), size = 6, tip.length = 0.01,
+                     label.y = 1.2) +
+  stat_compare_means(comparisons = list(c("Telomerase","ALT")), method= "t.test",
+                     method.args = list(alternative ="two.sided"), size = 6, tip.length = 0.01,
+                     label.y = 1.4)
+
+
 
 
 

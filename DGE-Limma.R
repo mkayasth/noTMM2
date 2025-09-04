@@ -1305,6 +1305,227 @@ candidate_genes <- intersect(t_test_results_sig2$Gene, t_test_results_sig3$Gene)
 
 # no common when only looking at high risk.
 
+###############################################################################################
+
+# high risk -- NO_TMM vs. TMM.
+
+source("DataCleaning.R")
+metadata <- metadata[metadata$COG.Risk.Group == "High Risk", ]
+Expression <- Expression[, colnames(Expression) %in% metadata$SampleID, drop = FALSE]
+Expression <- Expression[, match(metadata$SampleID, colnames(Expression))]
+
+
+##### 1) Doing differential gene expression using Limma for our log raw counts data. NO_TMM vs. TMM.
+
+# creating design matrix for limma.
+metadata$TMM_Case <- as.factor(metadata$TMM_Case)
+metadata <- metadata %>%
+  arrange(TMM_Case)
+
+design <- model.matrix(~ 0 + TMM_Case, data = metadata)
+colnames(design) <- levels(metadata$TMM_Case)
+
+
+# Estimating array weights to account for sample-specific variability in library sizes.
+Expression <- Expression[, match(metadata$SampleID, colnames(Expression))]
+
+weights <- arrayWeights(Expression, design = design)
+
+# Fitting linear model using limma.
+fit <- lmFit(Expression, design, weights = weights)
+fit <- eBayes(fit, trend = TRUE)
+
+# Contrasts: NO_TMM vs TMM && TMM Vs. NO_TMM.
+contrast.matrix <- makeContrasts(
+  NO_TMMvsTMM = NO_TMM-TMM,
+  TMMvsNO_TMM = TMM-NO_TMM,
+  levels = design
+)
+
+fit2 <- contrasts.fit(fit, contrast.matrix)
+fit2 <- eBayes(fit2, trend = TRUE)
+
+# top results for NO_TMM.
+noTMM_results <- topTable(fit2, coef = "NO_TMMvsTMM", number = Inf, adjust = "fdr")
+
+# top results for TMM.
+TMM_results <- topTable(fit2, coef = "TMMvsNO_TMM", number = Inf, adjust = "fdr")
+
+# Filtering for FDR < 0.01.
+noTMM_candidates <- noTMM_results[round(noTMM_results$adj.P.Val, 2) <= 0.01 & (noTMM_results$logFC >= 0.5 | noTMM_results$logFC <= -0.5), ]
+TMM_candidates <- TMM_results[round(TMM_results$adj.P.Val, 2) <= 0.01 & (TMM_results$logFC >= 0.5 | TMM_results$logFC <= -0.5), ]
+
+
+# in noTMM-TMM, positive genes will have gene status NO_TMM and negative logFC genes will have gene status TMM.
+noTMM_results <- noTMM_results %>%
+  mutate("Gene Status" = case_when(
+    rownames(noTMM_results) %in% rownames(noTMM_candidates) & noTMM_results$logFC > 0 ~ "NO_TMM",
+    rownames(noTMM_results) %in% rownames(noTMM_candidates) & noTMM_results$logFC < 0 ~ "TMM",
+    TRUE ~ "Not significant"))
+
+noTMM_candidates <- noTMM_candidates %>%
+  mutate("Gene Status" = case_when(
+    noTMM_candidates$logFC > 0 ~ "NO_TMM",
+    noTMM_candidates$logFC < 0 ~ "TMM",
+    TRUE ~ "Not significant"))
+
+
+
+##### 2) t-test of the DEGs.
+# Initializing an empty data frame for storing t-test results.
+noTMM_candidates <- rownames_to_column(noTMM_candidates, var = "Gene")
+dge_gene <- Expression[rownames(Expression) %in% noTMM_candidates$Gene, ,drop = FALSE]
+
+t_test_results <- data.frame(
+  Gene = character(),
+  p_value_t_test = numeric(),
+  stringsAsFactors = FALSE
+)
+
+# all p-values for FDR adjustment later.
+all_p_values <- numeric()
+
+# Looping through each gene in dge_gene.
+for (i in 1:nrow(noTMM_candidates)) {
+  
+  gene_id <- noTMM_candidates$Gene[i]
+  
+  
+  # Extracting the expression values for this gene, keeping it as a matrix. We are only selecting significant genes (all samples for this gene).
+  gene_Expression <- dge_gene[rownames(dge_gene) == gene_id, , drop = FALSE]
+  
+  # Creating C1 and C2 group. For the gene we are working with, all NO_TMM sample expression data placed in c1_group and all TMM sample expression data placed in c2_group.
+  c1_group <- gene_Expression[, metadata$TMM_Case == "NO_TMM", drop = FALSE]
+  c2_group <- gene_Expression[, metadata$TMM_Case == "TMM", drop = FALSE]
+  
+  # for a gene, compare c1 and c2 samples.
+  t_test <- t.test(c1_group, c2_group)
+  p_value_t_test <- t_test$p.value
+  all_p_values <- c(all_p_values, p_value_t_test)
+  
+  
+  # Storing the results.
+  t_test_results <- rbind(t_test_results, data.frame(
+    Gene = gene_id,
+    p_value_t_test = p_value_t_test
+  ))
+  
+  
+  
+  # removing un-required intermediates formed while forming the t-test table above.
+  rm(gene_id)
+  rm(gene_Expression)
+  rm(c1_group)
+  rm(c2_group)
+  rm(p_value_t_test)
+  rm(t_test)
+}
+
+# Calculating the FDR-adjusted p-values
+t_test_results$fdr_t_test <- p.adjust(all_p_values, method = "BH")
+
+
+t_test_results <- merge(t_test_results, noTMM_candidates[, c("Gene", "Gene Status")],  by = "Gene", all.x = TRUE)
+
+
+# Storing significant t-test results where FDR is less than 0.01.
+t_test_results_sig <- t_test_results[round(t_test_results$fdr_t_test, 2) <= 0.01, ]
+
+dge_gene <-dge_gene[rownames(dge_gene) %in% t_test_results_sig$Gene, ]
+dge_gene <- dge_gene[match(t_test_results_sig$Gene, rownames(dge_gene)), ]
+
+
+##### 3) Linear regression test of candidate genes.
+regression_results <- data.frame(
+  Gene = character(),
+  estimate = numeric(),
+  p_value = numeric(),
+  R.squared = numeric(),
+  stringsAsFactors = FALSE
+)
+
+# for each gene in the candidate list, updating regression_results.
+for (gene in rownames(dge_gene)) {
+  
+  data <- data.frame(gene_Expression = as.numeric(dge_gene[gene, ]), 
+                     TMMstatus = metadata$TMM_Case)
+  
+  # Fit linear model.
+  model <- lm(gene_Expression ~ TMMstatus, data = data)
+  summary_model <- summary(model)
+  
+  
+  # Store regression results.
+  regression_results <- rbind(regression_results, data.frame(
+    Gene = gene,
+    estimate = summary_model$coefficients[2, 1],
+    p_value = summary_model$coefficients[2, 4],
+    R.Squared = summary_model$r.squared
+  ))
+  
+  # removing intermediates.
+  rm(data)
+  rm(summary_model)
+  rm(gene)
+  rm(estimate)
+  rm(p_value)
+  rm(R.squared)
+}
+
+# adjusted p-values.
+regression_results$Adj.P.Value <- p.adjust(regression_results$p_value, method = "fdr")
+
+# Filtering for r-squared >= 0.3 & fdr <= 0.01.
+regression_results_sig <- regression_results %>%
+  filter(round(Adj.P.Value, 2) <= 0.01 & round(R.Squared, 1) >= 0.3)
+regression_results_sig <- merge(regression_results_sig, noTMM_candidates[, c("Gene", "Gene Status")],  by = "Gene", all.x = TRUE)
+
+
+##### Making volcano plot for NO_TMM vs. TMM.
+
+top_labels <- regression_results_sig$Gene
+
+EnhancedVolcano(noTMM_results,
+                lab = rownames(noTMM_results),
+                x = 'logFC',
+                y = 'adj.P.Val',
+                selectLab = top_labels,  # highlighting signature genes.
+                xlab = bquote(~Log[2]~ 'fold change'),
+                ylab = bquote(~-Log[10]~ 'FDR'),
+                title = NULL,
+                subtitle = NULL,
+                pCutoff = 0.01,
+                FCcutoff = 0.5,
+                pointSize = 2.0,
+                arrowheads = FALSE,
+                max.overlaps = 13,
+                labFace = 'bold',
+                boxedLabels = TRUE,
+                labSize = 1.0,
+                drawConnectors = TRUE,
+                widthConnectors = 0.3,
+                colAlpha = 0.8,
+                legendLabels = c('Not Significant','Significant logFC','Significant P-value ','Significant P-value & LogFC'),
+                col = c('grey80', 'grey50', 'grey25', 'purple'),
+                ylim = c(0, 5),
+                caption = "Cutoffs: FDR <= 0.01, |Log2FC| >= 0.5"
+) + theme_classic() + 
+  theme(axis.title = element_text(size = 18),
+        axis.text = element_text(size = 15),
+        legend.text = element_text(size = 12),
+        legend.title = element_blank(),
+        plot.caption = element_text(size = 14))
+
+
+##########################################################################################
+
+
+
+
+
+
+
+
 
 
 

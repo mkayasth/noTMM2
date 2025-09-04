@@ -8,6 +8,8 @@ library(uwot)
 library(cluster)
 library(cmapR)
 library(GSVA)
+library(ComplexHeatmap)
+library(ggpubr)
 
 ExpressionFpkm <- readRDS("TARGET_GEdata_062024.RDS")
 
@@ -617,6 +619,173 @@ dev.off()
 
 #################################################################################
 
+### same heatmap but on the Ackerman dataset.
+
+library(cmapR)
+library(ComplexHeatmap)
+
+gct_file <- parse_gctx("Neuroblastoma_208Samples.gct")
+ackerman_NB <- gct_file@mat
+
+# Loading metadata.
+ackerman_metadata <- read.table(file = 'NBL_Ackerman_CompleteMeta.txt', header = TRUE, sep = '\t')
+
+# only including SampleID in microarray data present in metadata.
+ackerman_NB <- ackerman_NB[, colnames(ackerman_NB) %in% ackerman_metadata$SampleID]
+ackerman_metadata <- ackerman_metadata[ackerman_metadata$SampleID %in% colnames(ackerman_NB), ]
+
+ackerman_metadata <- ackerman_metadata %>%
+  arrange(TMM_Case)
+
+ackerman_NB <- ackerman_NB[, match(ackerman_metadata$SampleID, colnames(ackerman_NB))]
+
+
+
+# heatmap from Thirant single cell markers.
+
+heatmap_genes <- c("KLF7", "GATA3", "HAND2", "PHOX2A", "ISL1", "HAND1", "PHOX2B", "TFAP2B", "GATA2", "SATB1", "SIX3", "EYA1", "SOX11", "DACH1", "ASCL1", "HEY1", "KLF13", "PBX3",
+                   "VIM", "FN1", "MEOX2", "ID1", "EGR3", "AEBP1", "CBFB", "IRF3", "IRF2", "IRF1", "TBX18", "MAFF", "RUNX2", "ZFP36L1", "NR3C1", "BHLHE41", "GLIS3", "RUNX1", "FOSL1", "FOSL2", "ELK4", "IFI16", "SIX4", "FLI1", "MAML2", "SMAD3", "DCAF6", "WWTR1", "SOX9", "MEF2D", "ZNF217", "PRRX1", "CREG1", "NOTCH2", "SIX1", "MEOX1")
+
+heatmap_genes <- heatmap_genes[heatmap_genes %in% rownames(ackerman_NB)]
+
+
+
+expression_matrix <- t(scale(t(ackerman_NB[rownames(ackerman_NB) %in% heatmap_genes, ,drop = FALSE])))
+
+# adding gsva as annotation.
+
+grp_map <- setNames(c(rep("Adrenergic", 18), rep("Mesenchymal", 33)), heatmap_genes)
+row_groups <- factor(grp_map[rownames(expression_matrix)], levels = c("Adrenergic","Mesenchymal"))
+
+# Running GSVA.
+gene_set_list_adrenergic <-list(ADRN = c("KLF7", "GATA3", "HAND2", "PHOX2A", "ISL1", "HAND1", "PHOX2B", "TFAP2B", "GATA2", "SATB1", "SIX3", "EYA1", "SOX11", "DACH1", "ASCL1", "HEY1", "KLF13", "PBX3"))
+gene_set_list_mesenchymal <- list(MES = c("VIM", "FN1", "MEOX2", "ID1", "EGR3", "AEBP1", "CBFB", "IRF3", "IRF2", "IRF1", "TBX18", "MAFF", "RUNX2", "ZFP36L1", "NR3C1", "BHLHE41", "GLIS3", "RUNX1", "FOSL1", "FOSL2", "ELK4", "IFI16", "SIX4", "FLI1", "MAML2", "SMAD3", "DCAF6", "WWTR1", "SOX9", "MEF2D", "ZNF217", "PRRX1", "CREG1", "NOTCH2", "SIX1", "MEOX1"))
+
+
+gsvapar <- gsvaParam(as.matrix(ackerman_NB), gene_set_list_adrenergic, kcdf = "Gaussian")
+gsva_result <- gsva(gsvapar)
+
+gsvapar2 <- gsvaParam(as.matrix(ackerman_NB), gene_set_list_mesenchymal, kcdf = "Gaussian")
+gsva_result2 <- gsva(gsvapar2)
+
+
+adr <- as.numeric(gsva_result[1, ])
+names(adr) <- colnames(gsva_result)
+
+mes <- as.numeric(gsva_result2[1, ])
+names(mes) <- colnames(gsva_result2)
+
+stopifnot(all(colnames(ackerman_NB) %in% names(adr)))
+stopifnot(all(colnames(ackerman_NB) %in% names(mes)))
+
+# computing clustering order first(no annotation yet).
+
+ht_pre <- Heatmap(
+  expression_matrix,
+  row_split         = row_groups,
+  cluster_columns   = TRUE,
+  cluster_rows      = FALSE,
+  show_column_names = TRUE,
+  row_names_gp      = gpar(fontsize = 8, fontface = "bold"),
+  column_names_gp   = gpar(fontsize = 8),
+  column_names_rot  = 45
+)
+ht_pre <- draw(ht_pre)
+
+# column order for annotation.
+co <- column_order(ht_pre)
+ord_idx <- if (is.list(co)) unlist(co, recursive = TRUE, use.names = FALSE) else as.integer(co)
+
+# sanity check
+stopifnot(length(ord_idx) == ncol(expression_matrix))
+stopifnot(identical(sort(ord_idx), seq_len(ncol(expression_matrix))))
+
+ord_samples <- colnames(expression_matrix)[ord_idx]
+
+
+adr <- setNames(as.numeric(gsva_result[1, ]),  colnames(gsva_result))
+mes <- setNames(as.numeric(gsva_result2[1, ]), colnames(gsva_result2))
+
+
+adr_ord <- adr[ord_samples]
+mes_ord <- mes[ord_samples]
+
+
+adr_col <- ifelse(adr_ord > 0, "blue", "red")
+mes_col <- ifelse(mes_ord > 0, "blue", "red")
+
+top_anno <- HeatmapAnnotation(
+  ADR = anno_barplot(
+    adr_ord,
+    gp = gpar(fill = adr_col),
+    axis_param = list(at = c(-1, 0, 1), labels = c("-1", "0", "1"))
+  ),
+  MES = anno_barplot(
+    mes_ord,
+    gp = gpar(fill = mes_col),
+    axis_param = list(at = c(-1, 0, 1), labels = c("-1", "0", "1"))
+  ),
+  which = "column"
+)
+
+
+
+# final heatmap.
+ht_final <- Heatmap(
+  expression_matrix[, ord_samples, drop = FALSE],
+  row_split         = row_groups,
+  cluster_columns   = TRUE,         
+  cluster_rows      = FALSE,
+  show_column_names = TRUE,
+  top_annotation    = top_anno,
+  row_names_gp      = gpar(fontsize = 8, fontface = "bold"),
+  column_names_gp   = gpar(fontsize = 5),
+  column_names_rot  = 45,
+  cell_fun = function(j, i, x, y, w, h, fill) {
+    grid.rect(x, y, w, h, gp = gpar(col = "black", fill = NA, lwd = 0.25))
+  })
+
+
+pdf("adr-mesHeatmapAckerman.pdf", width = 15, height = 10)
+draw(ht_final)
+dev.off()
+
+# coloring NO_TMMs.
+highlight_samples_NOTMM <- ackerman_metadata$SampleID[ackerman_metadata$TMM_Category == "NO_TMM"]
+highlight_samples_ALT <- ackerman_metadata$SampleID[ackerman_metadata$TMM_Category == "ALT"]
+highlight_samples_Telomerase <- ackerman_metadata$SampleID[ackerman_metadata$TMM_Category == "Telomerase"]
+
+
+mat <- expression_matrix[, ord_samples, drop = FALSE]
+
+sample_colors <- setNames(rep("black", ncol(mat)), colnames(mat))
+sample_colors[highlight_samples_NOTMM]      <- "black"
+sample_colors[highlight_samples_ALT]        <- "blue"
+sample_colors[highlight_samples_Telomerase] <- "red"
+
+ht_final <- Heatmap(
+  mat,
+  name = "expr",
+  row_split         = row_groups,
+  cluster_columns   = TRUE,
+  cluster_rows      = FALSE,
+  show_column_names = TRUE,               
+  column_names_gp   =  gpar(col = sample_colors[colnames(mat)], fontsize = 5),
+  top_annotation    = top_anno,
+  row_names_gp      = gpar(fontsize = 8, fontface = "bold"),
+  cell_fun = function(j, i, x, y, w, h, fill) {
+    grid.rect(x, y, w, h, gp = gpar(col = "black", fill = NA, lwd = 0.25))
+  }
+)
+
+pdf("adr-mesHeatmapAckerman-TMM.pdf", width = 15, height = 10)
+draw(ht_final)
+dev.off()
+
+
+################################################################################################
+
+
 
 # heatmap using only the genes with association with extend [fdr < 0.01]. // from playground.R.
 
@@ -715,7 +884,12 @@ dev.off()
 mes <- as.data.frame(mes)
 
 c1_samples <- rownames(mes)[rownames(mes) %in% metadata$SampleID[metadata$TMM == "Telomerase"] & mes$mes > 0] # MES samples for some reason.
+c1 <- rownames(mes)[mes$mes > 0]
+
+
 c2_samples <- rownames(mes)[rownames(mes) %in% metadata$SampleID[metadata$TMM == "Telomerase"] & mes$mes < 0] # telomerase and not mes.
+c2 <- rownames(mes)[mes$mes < 0]
+
 
 
 ##### first TERT rank comparison.
@@ -790,7 +964,7 @@ plot_data <- data.frame(
   Group = c(rep("MES", length(extend_c1)), rep("Not-MES", length(extend_c2)))
 )
 
-# Boxplot with jittered points
+# Boxplot with jittered points.
 ggplot(plot_data, aes(x = Group, y = Rank, fill = Group, color = Group)) +
   geom_boxplot(outlier.shape = NA, alpha = 0.5, size = 0.2) +
   geom_point(position = position_jitter(width = 0.2), size = 3) +
@@ -814,6 +988,177 @@ ggplot(plot_data, aes(x = Group, y = Rank, fill = Group, color = Group)) +
 
 
 ########################################################################################################################
+
+
+# heatmap of using only the genes with association with extend [fdr < 0.01] -- for Ackerman...
+
+gct_file <- parse_gctx("Neuroblastoma_208Samples.gct")
+ackerman_NB <- gct_file@mat
+
+# Loading metadata.
+ackerman_metadata <- read.table(file = 'NBL_Ackerman_CompleteMeta.txt', header = TRUE, sep = '\t')
+
+# only including SampleID in microarray data present in metadata.
+ackerman_NB <- ackerman_NB[, colnames(ackerman_NB) %in% ackerman_metadata$SampleID]
+ackerman_metadata <- ackerman_metadata[ackerman_metadata$SampleID %in% colnames(ackerman_NB), ]
+
+ackerman_metadata <- ackerman_metadata %>%
+  arrange(TMM_Case)
+
+ackerman_NB <- ackerman_NB[, match(ackerman_metadata$SampleID, colnames(ackerman_NB))]
+
+
+mes_genes <- list(MES = c("MEOX1", "WWTR1", "VIM", "CD44", "CBFB", "FOSL2", "MEOX2", "GLIS3", "TBX18", "NR3C1",
+                          "PRRX1", "MEF2D", "BHLHE41", "RUNX2", "IRF1", "NOTCH2", "YAP1", "CREG1", "DCAF6", "FLI1",
+                          "RUNX1", "IRF2", "JUN", "MAML2", "ZFP36L1"))
+
+mes_genes$MES <- mes_genes$MES[mes_genes$MES %in% rownames(ackerman_NB)]
+
+
+
+expression_matrix <- t(scale(t(ackerman_NB[rownames(ackerman_NB) %in% unlist(mes_genes), ,drop = FALSE])))
+
+
+gsvapar <- gsvaParam(as.matrix(ackerman_NB), mes_genes, kcdf = "Gaussian")
+gsva_result <- gsva(gsvapar)
+
+mes <- as.numeric(gsva_result[1, ])
+names(mes) <- colnames(gsva_result)
+
+# computing clustering order first(no annotation yet).
+
+ht_pre <- Heatmap(
+  expression_matrix,
+  row_order = rownames(expression_matrix),
+  cluster_columns   = TRUE,
+  cluster_rows      = FALSE,
+  show_column_names = TRUE,
+  row_names_gp      = gpar(fontsize = 8, fontface = "bold"),
+  column_names_gp   = gpar(fontsize = 8),
+  column_names_rot  = 45
+)
+ht_pre <- draw(ht_pre)
+
+# column order for annotation.
+co <- column_order(ht_pre)
+ord_idx <- if (is.list(co)) unlist(co, recursive = TRUE, use.names = FALSE) else as.integer(co)
+
+# sanity check
+stopifnot(length(ord_idx) == ncol(expression_matrix))
+stopifnot(identical(sort(ord_idx), seq_len(ncol(expression_matrix))))
+
+ord_samples <- colnames(expression_matrix)[ord_idx]
+
+mes <- setNames(as.numeric(gsva_result[1, ]), colnames(gsva_result))
+
+mes_ord <- mes[ord_samples]
+
+
+
+mes_col <- ifelse(mes_ord > 0, "blue", "red")
+
+top_anno <- HeatmapAnnotation(
+  
+  MES = anno_barplot(
+    mes_ord,
+    gp = gpar(fill = mes_col),
+    axis_param = list(at = c(-1, 0, 1), labels = c("-1", "0", "1"))
+  ),
+  which = "column"
+)
+
+# coloring NO_TMMs.
+highlight_samples_NOTMM <- ackerman_metadata$SampleID[ackerman_metadata$TMM_Category == "NO_TMM"]
+highlight_samples_ALT <- ackerman_metadata$SampleID[ackerman_metadata$TMM_Category == "ALT"]
+highlight_samples_Telomerase <- ackerman_metadata$SampleID[ackerman_metadata$TMM_Category == "Telomerase"]
+
+
+mat <- expression_matrix[, ord_samples, drop = FALSE]
+
+sample_colors <- setNames(rep("black", ncol(mat)), colnames(mat))
+sample_colors[highlight_samples_NOTMM]      <- "black"
+sample_colors[highlight_samples_ALT]        <- "blue"
+sample_colors[highlight_samples_Telomerase] <- "red"
+
+# final heatmap.
+ht_final <- Heatmap(
+  expression_matrix[, ord_samples, drop = FALSE],
+  row_order = rownames(expression_matrix),
+  cluster_columns   = TRUE,         
+  cluster_rows      = TRUE,
+  show_column_names = TRUE,
+  top_annotation    = top_anno,
+  row_names_gp      = gpar(fontsize = 8, fontface = "bold"),
+  column_names_gp   =  gpar(col = sample_colors[colnames(mat)], fontsize = 5),
+  column_names_rot  = 45,
+  cell_fun = function(j, i, x, y, w, h, fill) {
+    grid.rect(x, y, w, h, gp = gpar(col = "black", fill = NA, lwd = 0.25))
+  })
+
+
+pdf("mesHeatmapAckerman.pdf", width = 20, height = 10)
+draw(ht_final)
+dev.off()
+
+
+##################################################################################
+
+##### EXTEND score comparison for Telomerase Samples as per MES GSVA score.
+
+mes <- as.matrix(mes)
+mes <- as.data.frame(mes)
+colnames(mes) <- c("GSVA_Score")
+
+c1_samples <- rownames(mes)[rownames(mes) %in% ackerman_metadata$SampleID[ackerman_metadata$TMM_Category == "Telomerase"] & mes$GSVA_Score > 0] # MES samples for some reason.
+
+c2_samples <- rownames(mes)[rownames(mes) %in% ackerman_metadata$SampleID[ackerman_metadata$TMM_Category == "Telomerase"] & mes$GSVA_Score < 0] # telomerase and not mes.
+
+
+# telomeraseScores for the ackerman set.
+# extend score for each group.
+extendScores <- RunEXTEND(as.matrix(ackerman_NB))
+
+telomeraseScores <- read_delim("TelomeraseScores.txt")
+
+telomeraseScores <- telomeraseScores[, c("SampleID", "NormEXTENDScores")]
+telomeraseScores <- as.data.frame(telomeraseScores)
+telomeraseScores <- left_join(telomeraseScores, ackerman_metadata[, c("SampleID", "TMM_Category")], by = "SampleID")
+telomeraseScores <- telomeraseScores[!duplicated(telomeraseScores$SampleID), ]
+rownames(telomeraseScores) <- telomeraseScores$SampleID
+
+
+
+extend_c1 <- telomeraseScores[c1_samples, "NormEXTENDScores"]
+extend_c2 <- telomeraseScores[c2_samples, "NormEXTENDScores"]
+
+# making a boxplot.
+
+plot_data <- data.frame(
+  Rank = c(extend_c1, extend_c2),
+  Group = c(rep("MES", length(extend_c1)), rep("Not-MES", length(extend_c2)))
+)
+
+# Boxplot with jittered points.
+ggplot(plot_data, aes(x = Group, y = Rank, fill = Group, color = Group)) +
+  geom_boxplot(outlier.shape = NA, alpha = 0.5, size = 0.2) +
+  geom_point(position = position_jitter(width = 0.2), size = 3) +
+  scale_fill_manual(values = c("MES" = "lightpink2", 
+                               "Not-MES" = "lightgreen")) +
+  scale_color_manual(values = c("MES"="darkred", 
+                                "Not-MES" = "darkgreen")) +
+  labs(title = "EXTEND Scores Comparison",
+       x = "Groups",
+       y = "EXTEND Score") +
+  theme_classic() +
+  theme(
+    axis.text.x = element_text(vjust = 1, hjust = 1),
+    axis.title = element_text(size = 18),
+    axis.text = element_text(size = 14, face = "bold"),
+    legend.position = "none"
+  ) +
+  stat_compare_means(comparisons = list(c("MES","Not-MES")), method= "t.test",
+                     method.args = list(alternative ="two.sided"), size = 6, tip.length = 0.01,
+                     label.y = 1.2)
 
 
 
