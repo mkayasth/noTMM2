@@ -520,7 +520,689 @@ ggplot(telomeraseScores, aes(x = TMM_Category, y = NormEXTENDScores, fill = TMM_
                      label.y = 1.4)
 
 
+##############################################################################################
 
+# heatmap to see the relationship between cell of origin timeline markers and TMM status.
+
+library(ComplexHeatmap)
+library(GSVA)
+source("DataCleaning.R")
+
+scp <- c("CDH19", "PLP1", "ERBB3", "MPZ", "ERBB4")
+chromaffin <- c("TH", "DBH", "DDC", "CHGA", "PNMT")
+neuroblast <- c("NEFM", "GAP43", "STMN2", "ISL1")
+early_neuroblast <- c("ALK")
+late_neuroblast <- c("SYN3", "IL7", "GAP43", "STMN2", "ISL1")
+bridge <- c("ERBB4", "ASCL1", "CDH9", "CTTNBP2")
+proliferation <- c("MKI67", "PCNA", "BIRC5", "CEP55", "TOP2A", "CDK1", "CDC20", "CCNB1", "CCNB2", "CCNA2", 
+                   "UBE2C", "AURKA", "AURKB", "PLK1", "PTTG1", "NUSAP1")
+
+
+expression_matrix <- t(scale(t(Expression[rownames(Expression) %in% c( "GAP43", "STMN2", "ISL1", "SYN3", "IL7"), ]))) # chromaffin and chromaffin adjacent genes.
+
+# adding gsva as annotation.
+
+# Running GSVA.
+
+gene_set_list_adrenergic <-list(ADRN = c("PHOX2A", "PHOX2B", "HAND2", "ISL1", "GATA3", "ASCL1", "TBX2", "DBH", "TH"))
+gene_set_list_mesenchymal <- list(MES = c("PRRX1", "RUNX1", "FOSL1", "JUN", "YAP1", "WWTR1", "MEOX1", 
+                                          "MEOX2", "SNAI2", "CD44", "FN1", "VIM"))
+
+gene_set_list_chromaffin <- list(chromaffin = c("TH", "DBH", "DDC", "CHGA", "PNMT"))
+gene_set_list_scp <- list(scp =  c("CDH19", "PLP1", "ERBB3", "MPZ", "ERBB4"))
+gene_set_list_neuroblast <- list(neuroblast = c("NEFM", "GAP43", "STMN2", "ISL1"))
+gene_set_list_lateNeuroblast <- list(lateNeuroblast = c("SYN3", "IL7", "GAP43", "STMN2", "ISL1"))
+gene_set_list_bridge <- list(bridge = c("ERBB4", "ASCL1", "CDH9", "CTTNBP2"))
+gene_set_list_proliferation <- list(proliferation = c("MKI67", "PCNA", "BIRC5", "CEP55", "TOP2A", "CDK1", "CDC20", "CCNB1", 
+                                                      "CCNB2", "CCNA2", "UBE2C", "AURKA", "AURKB", "PLK1", "PTTG1", "NUSAP1"))
+
+
+gsvapar <- gsvaParam(as.matrix(Expression), gene_set_list_adrenergic, kcdf = "Gaussian")
+gsva_result <- gsva(gsvapar)
+
+gsvapar2 <- gsvaParam(as.matrix(Expression), gene_set_list_mesenchymal, kcdf = "Gaussian")
+gsva_result2 <- gsva(gsvapar2)
+
+gsvapar3 <- gsvaParam(as.matrix(Expression), gene_set_list_chromaffin, kcdf = "Gaussian")
+gsva_result3 <- gsva(gsvapar3)
+
+gsvapar4 <- gsvaParam(as.matrix(Expression), gene_set_list_scp, kcdf = "Gaussian")
+gsva_result4 <- gsva(gsvapar4)
+
+gsvapar5 <- gsvaParam(as.matrix(Expression), gene_set_list_neuroblast, kcdf = "Gaussian")
+gsva_result5 <- gsva(gsvapar5)
+
+gsvapar6 <- gsvaParam(as.matrix(Expression), gene_set_list_lateNeuroblast, kcdf = "Gaussian")
+gsva_result6 <- gsva(gsvapar6)
+
+gsvapar7 <- gsvaParam(as.matrix(Expression), gene_set_list_bridge, kcdf = "Gaussian")
+gsva_result7 <- gsva(gsvapar7)
+
+gsvapar8 <- gsvaParam(as.matrix(Expression), gene_set_list_proliferation, kcdf = "Gaussian")
+gsva_result8 <- gsva(gsvapar8)
+
+
+adr <- as.numeric(gsva_result[1, ])
+names(adr) <- colnames(gsva_result)
+
+mes <- as.numeric(gsva_result2[1, ])
+names(mes) <- colnames(gsva_result2)
+
+chromaffin <- as.numeric(gsva_result3[1, ])
+names(chromaffin) <- colnames(gsva_result3)
+
+scp <- as.numeric(gsva_result4[1, ])
+names(scp) <- colnames(gsva_result4)
+
+neuroblast <- as.numeric(gsva_result5[1, ])
+names(neuroblast) <- colnames(gsva_result5)
+
+lateNeuroblast <- as.numeric(gsva_result6[1, ])
+names(lateNeuroblast) <- colnames(gsva_result6)
+
+bridge <- as.numeric(gsva_result7[1, ])
+names(bridge) <- colnames(gsva_result7)
+
+proliferation <- as.numeric(gsva_result8[1, ])
+names(proliferation) <- colnames(gsva_result8)
+
+
+
+stopifnot(all(colnames(Expression) %in% names(adr)))
+stopifnot(all(colnames(Expression) %in% names(mes)))
+stopifnot(all(colnames(Expression) %in% names(chromaffin)))
+stopifnot(all(colnames(Expression) %in% names(scp)))
+stopifnot(all(colnames(Expression) %in% names(neuroblast)))
+stopifnot(all(colnames(Expression) %in% names(lateNeuroblast)))
+stopifnot(all(colnames(Expression) %in% names(bridge)))
+stopifnot(all(colnames(Expression) %in% names(proliferation)))
+
+
+# computing clustering order first(no annotation yet).
+ht_pre <- Heatmap(
+  expression_matrix,
+  cluster_columns   = TRUE,
+  cluster_rows      = FALSE,
+  show_column_names = TRUE,
+  row_names_gp      = gpar(fontsize = 8, fontface = "bold"),
+  column_names_gp   = gpar(fontsize = 8),
+  column_names_rot  = 45
+)
+ht_pre <- draw(ht_pre)
+
+# column order for annotation.
+co <- column_order(ht_pre)
+
+ord_idx <- if (is.list(co)) unlist(co, recursive = TRUE, use.names = FALSE) else as.integer(co)
+
+# sanity check
+stopifnot(length(ord_idx) == ncol(expression_matrix))
+stopifnot(identical(sort(ord_idx), seq_len(ncol(expression_matrix))))
+
+ord_samples <- colnames(expression_matrix)[ord_idx]
+
+# gsva annotation in the same order now.
+adr <- setNames(as.numeric(gsva_result[1, ]),  colnames(gsva_result))
+mes <- setNames(as.numeric(gsva_result2[1, ]), colnames(gsva_result2))
+chromaffin <- setNames(as.numeric(gsva_result3[1, ]), colnames(gsva_result3))
+scp <- setNames(as.numeric(gsva_result4[1, ]), colnames(gsva_result4))
+neuroblast <- setNames(as.numeric(gsva_result5[1, ]), colnames(gsva_result5))
+lateNeuroblast <- setNames(as.numeric(gsva_result6[1, ]), colnames(gsva_result6))
+bridge <- setNames(as.numeric(gsva_result7[1, ]), colnames(gsva_result7))
+proliferation <- setNames(as.numeric(gsva_result8[1, ]), colnames(gsva_result8))
+
+
+# align to the display order
+adr_ord <- adr[ord_samples]
+mes_ord <- mes[ord_samples]
+chromaffin_ord <- chromaffin[ord_samples]
+scp_ord <- scp[ord_samples]
+neuroblast_ord <- neuroblast[ord_samples]
+lateNeuroblast_ord <- lateNeuroblast[ord_samples]
+bridge_ord <- bridge[ord_samples]
+proliferation_ord <- proliferation[ord_samples]
+
+
+adr_col <- ifelse(adr_ord > 0, "blue", "red")
+mes_col <- ifelse(mes_ord > 0, "blue", "red")
+chromaffin_col <- ifelse(chromaffin_ord > 0, "blue", "red")
+scp_col <- ifelse(scp_ord > 0, "blue", "red")
+neuroblast_col <- ifelse(neuroblast_ord > 0, "blue", "red")
+lateNeuroblast_col <- ifelse(lateNeuroblast_ord > 0, "blue", "red")
+bridge_col <- ifelse(bridge_ord > 0, "blue", "red")
+proliferation_col <- ifelse(proliferation_ord > 0, "blue", "red")
+
+top_anno <- HeatmapAnnotation(
+  ADR = anno_barplot(
+    adr_ord,
+    gp = gpar(fill = adr_col),
+    axis_param = list(at = c(-1, 0, 1), labels = c("-1", "0", "1"))
+  ),
+  MES = anno_barplot(
+    mes_ord,
+    gp = gpar(fill = mes_col),
+    axis_param = list(at = c(-1, 0, 1), labels = c("-1", "0", "1"))
+  ),
+  Chromaffin = anno_barplot(
+    chromaffin_ord,
+    gp = gpar(fill = chromaffin_col),
+    axis_param = list(at = c(-1, 0, 1), labels = c("-1", "0", "1"))
+  ),
+  SCP = anno_barplot(
+    scp_ord,
+    gp = gpar(fill = scp_col),
+    axis_param = list(at = c(-1, 0, 1), labels = c("-1", "0", "1"))
+  ),
+  Neuroblast = anno_barplot(
+    neuroblast_ord,
+    gp = gpar(fill = neuroblast_col),
+    axis_param = list(at = c(-1, 0, 1), labels = c("-1", "0", "1"))
+  ),
+  LateNeuroblast = anno_barplot(
+    lateNeuroblast_ord,
+    gp = gpar(fill = lateNeuroblast_col),
+    axis_param = list(at = c(-1, 0, 1), labels = c("-1", "0", "1"))
+  ),
+  Bridge = anno_barplot(
+    bridge_ord,
+    gp = gpar(fill = bridge_col),
+    axis_param = list(at = c(-1, 0, 1), labels = c("-1", "0", "1"))
+  ),
+   Proliferation = anno_barplot(
+    proliferation_ord,
+    gp = gpar(fill = proliferation_col),
+    axis_param = list(at = c(-1, 0, 1), labels = c("-1", "0", "1"))
+  ),
+  
+  which = "column"
+  
+)
+
+# coloring NO_TMMs.
+highlight_samples_NOTMM <- metadata$SampleID[metadata$TMM == "NO_TMM"]
+highlight_samples_ALT <- metadata$SampleID[metadata$TMM == "ALT"]
+highlight_samples_Telomerase <- metadata$SampleID[metadata$TMM == "Telomerase"]
+
+
+mat <- expression_matrix[, ord_samples, drop = FALSE]
+
+sample_colors <- setNames(rep("black", ncol(mat)), colnames(mat))
+sample_colors[highlight_samples_NOTMM]      <- "black"
+sample_colors[highlight_samples_ALT]        <- "blue"
+sample_colors[highlight_samples_Telomerase] <- "red"
+
+
+
+# final heatmap.
+ht_final <- Heatmap(
+  expression_matrix[, ord_samples, drop = FALSE],
+  cluster_columns   = TRUE,             
+  cluster_rows      = TRUE,
+  show_column_names = TRUE,
+  top_annotation    = top_anno,
+  row_names_gp      = gpar(fontsize = 8, fontface = "bold"),
+  column_names_gp   =  gpar(col = sample_colors[colnames(mat)], fontsize = 5),
+  column_names_rot  = 45,
+  cell_fun = function(j, i, x, y, w, h, fill) {
+    grid.rect(x, y, w, h, gp = gpar(col = "black", fill = NA, lwd = 0.25))
+  }
+)
+
+
+pdf("adr-mesHeatmapNeuroblast.pdf", width = 15, height = 7)
+draw(ht_final)
+dev.off()
+
+######################################################################################################
+
+
+########### test for:
+
+## NO_TMM: high proliferation vs. low proliferation ~ Low vs. High Risk.
+proliferation_ord <- as.data.frame(proliferation_ord)
+
+colnames(proliferation_ord) <- "GSVA_Score"
+proliferation_ord$SampleID <- rownames(proliferation_ord)
+rownames(proliferation_ord) = NULL
+
+proliferation_ord <- left_join(proliferation_ord, metadata[, c("SampleID", "TMM", "COG.Risk.Group", "MYCN.status")], by = "SampleID")
+
+proliferation_ord_noTMM <- proliferation_ord[proliferation_ord$TMM == "NO_TMM", ]
+
+
+# t-test doing difference between GSVA Score of high, intermediate and low risk in NO_TMM.
+ggplot(proliferation_ord, aes(x = COG.Risk.Group, y = GSVA_Score, fill = COG.Risk.Group, color = COG.Risk.Group)) +
+  geom_boxplot(size = 0.2, alpha = 0.5, outlier.shape = NA) +
+  geom_point(position = position_jitter(width = 0.2), size = 3) +
+  scale_fill_manual(values = c("High Risk" = "lightpink2", 
+                               "Low Risk" = "lightgreen",
+                               "Intermediate Risk" = "blue")) +
+  scale_color_manual(values = c("High Risk"="darkred", 
+                                "Low Risk" = "darkgreen",
+                                "Intermediate Risk" = "darkblue")) +
+  theme_classic() +
+  labs(x = "Risk Group", y = "Proliferation Marker GSVA Score") +
+  theme(
+    axis.text.x = element_text(vjust = 1, hjust = 1),
+    axis.title = element_text(size = 18),
+    axis.text = element_text(size = 12, face = "bold"),
+    legend.position = "none"
+  ) +
+  stat_compare_means(comparisons = list(c("High Risk","Low Risk")), method= "t.test",
+                     method.args = list(alternative ="two.sided"), size = 6, tip.length = 0.01,
+                     label.y = 1.2) + 
+  stat_compare_means(comparisons = list(c("High Risk","Intermediate Risk")), method= "t.test",
+                     method.args = list(alternative ="two.sided"), size = 6, tip.length = 0.01,
+                     label.y = 1.4) +
+  stat_compare_means(comparisons = list(c("Low Risk","Intermediate Risk")), method= "t.test",
+                     method.args = list(alternative ="two.sided"), size = 6, tip.length = 0.01,
+                     label.y = 1.1)
+
+# t-test doing difference between GSVA Score of Telomerase, ALT and NO_TMM.
+ggplot(proliferation_ord, aes(x = TMM, y = GSVA_Score, fill = TMM, color = TMM)) +
+  geom_boxplot(size = 0.2, alpha = 0.5, outlier.shape = NA) +
+  geom_point(position = position_jitter(width = 0.2), size = 3) +
+  scale_fill_manual(values = c("Telomerase" = "lightpink2", 
+                               "NO_TMM" = "lightgreen",
+                               "ALT" = "blue")) +
+  scale_color_manual(values = c("Telomerase"="darkred", 
+                                "NO_TMM" = "darkgreen",
+                                "ALT" = "darkblue")) +
+  theme_classic() +
+  labs(x = "Class", y = "Proliferation Marker GSVA Score") +
+  theme(
+    axis.text.x = element_text(vjust = 1, hjust = 1),
+    axis.title = element_text(size = 18),
+    axis.text = element_text(size = 12, face = "bold"),
+    legend.position = "none"
+  ) +
+  stat_compare_means(comparisons = list(c("ALT","NO_TMM")), method= "t.test",
+                     method.args = list(alternative ="two.sided"), size = 6, tip.length = 0.01,
+                     label.y = 1.2) +
+  stat_compare_means(comparisons = list(c("Telomerase","NO_TMM")), method= "t.test",
+                     method.args = list(alternative ="two.sided"), size = 6, tip.length = 0.01,
+                     label.y = 1.4)
+
+
+#######
+
+
+
+## Late neuroblast ~ NO_TMM vs. others?
+lateNeuroblast_ord <- as.data.frame(lateNeuroblast_ord)
+
+colnames(lateNeuroblast_ord) <- "GSVA_Score"
+lateNeuroblast_ord$SampleID <- rownames(lateNeuroblast_ord)
+rownames(lateNeuroblast_ord) = NULL
+
+lateNeuroblast_ord <- left_join(lateNeuroblast_ord, metadata[, c("SampleID", "TMM", "COG.Risk.Group", "MYCN.status")], by = "SampleID")
+
+lateNeuroblast_ord_noTMM <- lateNeuroblast_ord[lateNeuroblast_ord$TMM == "NO_TMM", ]
+
+# t-test doing difference between GSVA Score of high, intermediate and low risk in NO_TMM.
+ggplot(lateNeuroblast_ord_noTMM, aes(x = COG.Risk.Group, y = GSVA_Score, fill = COG.Risk.Group, color = COG.Risk.Group)) +
+  geom_boxplot(size = 0.2, alpha = 0.5, outlier.shape = NA) +
+  geom_point(position = position_jitter(width = 0.2), size = 3) +
+  scale_fill_manual(values = c("High Risk" = "lightpink2", 
+                               "Low Risk" = "lightgreen",
+                               "Intermediate Risk" = "blue")) +
+  scale_color_manual(values = c("High Risk"="darkred", 
+                                "Low Risk" = "darkgreen",
+                                "Intermediate Risk" = "darkblue")) +
+  theme_classic() +
+  labs(x = "Risk Group", y = "Late Neuroblasts Markers GSVA Score") +
+  theme(
+    axis.text.x = element_text(vjust = 1, hjust = 1),
+    axis.title = element_text(size = 18),
+    axis.text = element_text(size = 12, face = "bold"),
+    legend.position = "none"
+  ) +
+  stat_compare_means(comparisons = list(c("High Risk","Low Risk")), method= "t.test",
+                     method.args = list(alternative ="two.sided"), size = 6, tip.length = 0.01,
+                     label.y = 1.2) +
+  stat_compare_means(comparisons = list(c("High Risk","Intermediate Risk")), method= "t.test",
+                     method.args = list(alternative ="two.sided"), size = 6, tip.length = 0.01,
+                     label.y = 1.4)
+
+
+# t-test doing difference between GSVA Score of Telomerase, ALT and NO_TMM.
+ggplot(lateNeuroblast_ord, aes(x = TMM, y = GSVA_Score)) +
+  geom_boxplot(aes(fill = TMM, group = TMM), size = 0.2, alpha = 0.5, outlier.shape = NA) +
+  geom_point(aes(color = TMM), position = position_jitter(width = 0.2), size = 3) +
+  scale_fill_manual(values = c("Telomerase" = "lightpink2", 
+                               "NO_TMM" = "lightgreen",
+                               "ALT" = "blue")) +
+  scale_color_manual(values = c("Telomerase"="darkred", 
+                                "ALT" = "darkblue",
+                                "NO_TMM" = "darkgreen")) +
+  theme_classic() +
+  labs(x = "Class", y = "Late Neuroblasts Markers GSVA Score") +
+  theme(
+    axis.text.x = element_text(vjust = 1, hjust = 1),
+    axis.title = element_text(size = 18),
+    axis.text = element_text(size = 12, face = "bold"),
+    legend.position = "none"
+  ) +
+  stat_compare_means(comparisons = list(c("ALT","NO_TMM")), method= "t.test",
+                     method.args = list(alternative ="two.sided"), size = 6, tip.length = 0.01,
+                     label.y = 1.2) +
+  stat_compare_means(comparisons = list(c("Telomerase","NO_TMM")), method= "t.test",
+                     method.args = list(alternative ="two.sided"), size = 6, tip.length = 0.01,
+                     label.y = 1.4)
+
+
+# t-test doing difference between GSVA Score of mycn amplified, non-amplified.
+lateNeuroblast_ord <- as.data.frame(lateNeuroblast_ord)
+lateNeuroblast_ord <- lateNeuroblast_ord[lateNeuroblast_ord$MYCN.status %in% c("Amplified", "Not Amplified"), ] 
+
+ggplot(lateNeuroblast_ord, aes(x = MYCN.status, y = GSVA_Score, fill = MYCN.status, color = MYCN.status)) +
+  geom_boxplot(size = 0.2, alpha = 0.5, outlier.shape = NA) +
+  geom_point(position = position_jitter(width = 0.2), size = 3) +
+  scale_fill_manual(values = c("Amplified" = "lightpink2", 
+                               "Not Amplified" = "lightgreen")) +
+  scale_color_manual(values = c("Amplified"="darkred", 
+                                "Not Amplified" = "darkgreen")) +
+  theme_classic() +
+  labs(x = "Risk Group", y = "Late Neuroblasts Markers GSVA Score") +
+  theme(
+    axis.text.x = element_text(vjust = 1, hjust = 1),
+    axis.title = element_text(size = 18),
+    axis.text = element_text(size = 12, face = "bold"),
+    legend.position = "none"
+  ) +
+  stat_compare_means(comparisons = list(c("Amplified", "Not Amplified")), method= "t.test",
+                     method.args = list(alternative = "two.sided"), size = 6, tip.length = 0.01,
+                     label.y = 1.2)
+
+
+# t-test doing difference between GSVA Score of high, intermediate and low risk in ALL samples.
+ggplot(lateNeuroblast_ord, aes(x = COG.Risk.Group, y = GSVA_Score, fill = COG.Risk.Group, color = COG.Risk.Group)) +
+  geom_boxplot(size = 0.2, alpha = 0.5, outlier.shape = NA) +
+  geom_point(position = position_jitter(width = 0.2), size = 3) +
+  scale_fill_manual(values = c("High Risk" = "lightpink2", 
+                               "Low Risk" = "lightgreen",
+                               "Intermediate Risk" = "blue")) +
+  scale_color_manual(values = c("High Risk"="darkred", 
+                                "Low Risk" = "darkgreen",
+                                "Intermediate Risk" = "darkblue")) +
+  theme_classic() +
+  labs(x = "Risk Group", y = "Late Neuroblasts Markers GSVA Score") +
+  theme(
+    axis.text.x = element_text(vjust = 1, hjust = 1),
+    axis.title = element_text(size = 18),
+    axis.text = element_text(size = 12, face = "bold"),
+    legend.position = "none"
+  ) +
+  stat_compare_means(comparisons = list(c("High Risk","Low Risk")), method= "t.test",
+                     method.args = list(alternative ="two.sided"), size = 6, tip.length = 0.01,
+                     label.y = 1.2)
+
+## 
+
+
+########################################################################################################
+##### Now, correlation studies.
+
+# GSVA NO_TMM vs. Proliferation Rank.
+source("DataCleaning.R")
+
+gene_list_noTMM <- list("NO_TMM Genes" = c("CPNE8", "PGM2L1", "LIFR", "CNR1", "HECW2", "CPNE3", "HOXC9", "SNX16", "IGSF10",
+                                           "PRR7", "IGLV6-57", "SAC3D1", "CCDC86", "DDN"))
+gene_list_proliferation <- c("MKI67", "PCNA", "BIRC5", "CEP55", "TOP2A", "CDK1", "CDC20", "CCNB1", 
+                                                    "CCNB2", "CCNA2", "UBE2C", "AURKA", "AURKB", "PLK1", "PTTG1", "NUSAP1")
+# ranks of proliferation gene.
+ExpressionFpkm <- readRDS("TARGET_GEdata_062024.RDS")
+
+
+
+# Data filtering: only including sample IDs from metadata present in the fpkm dataset & vice-versa.
+metadata <- metadata %>%
+  filter(SampleID %in% colnames(ExpressionFpkm))
+ExpressionFpkm <- ExpressionFpkm[, colnames(ExpressionFpkm) %in% metadata$SampleID, drop = FALSE]
+
+metadata <- metadata %>%
+  arrange(TMM)
+
+ExpressionFpkm <- ExpressionFpkm[, match(metadata$SampleID, colnames(ExpressionFpkm))]
+
+# ranking the genes in ExpressionFpkm.
+ranked_TARGET_NBL <- apply(ExpressionFpkm, 2, function(x) rank(x, ties.method = "average"))
+
+gene_list_proliferation <- intersect(gene_list_proliferation, rownames(ranked_TARGET_NBL))
+gene_proliferation <- t(as.matrix(ranked_TARGET_NBL[gene_list_proliferation, , drop = FALSE]))
+
+gsva <- gsvaParam(as.matrix(Expression), gene_list_noTMM, kcdf = "Gaussian")
+GSVA_result <- gsva(gsva)
+GSVA_df <- as.data.frame(GSVA_result)
+GSVA_long_noTMM <- pivot_longer(GSVA_df, cols = everything(), names_to = "SampleID", values_to = "GSVA_Score")
+
+
+GSVA_long_noTMM <- GSVA_long_noTMM[match(rownames(gene_proliferation),
+                                         GSVA_long_noTMM$SampleID), , drop = FALSE]
+
+
+
+
+y <- GSVA_long_noTMM$GSVA_Score
+
+
+cor_values <- numeric(ncol(gene_proliferation))
+p_values   <- numeric(ncol(gene_proliferation))
+
+
+for (i in seq_len(ncol(gene_proliferation))) {
+  a <- as.numeric(gene_proliferation[, i])
+  b <- complete.cases(a, y)
+  correlation <- cor.test(a[b], y[b], method = "spearman", exact = FALSE)
+  cor_values[i] <- unname(correlation$estimate)
+  p_values[i]   <- correlation$p.value
+}
+
+cor_results <- data.frame(
+  Gene = colnames(gene_proliferation),
+  estimate = cor_values,
+  p_value = p_values,
+  fdr = p.adjust(p_values, "BH"),
+  stringsAsFactors = FALSE
+)[order(p.adjust(p_values, "BH"), -abs(cor_values)), ]
+
+noTMM_proliferation_sig <- cor_results[cor_results$fdr < 0.01, ]
+
+# GSVA Proliferation vs. extend
+source("DataCleaning.R")
+
+
+gene_list_proliferation <- c("MKI67", "PCNA", "BIRC5", "CEP55", "TOP2A", "CDK1", "CDC20", "CCNB1", 
+                             "CCNB2", "CCNA2", "UBE2C", "AURKA", "AURKB", "PLK1", "PTTG1", "NUSAP1")
+
+# 0) Keep only genes that exist (avoid NA rows)
+gene_list_proliferation <- intersect(gene_list_proliferation, rownames(Expression))
+gene_proliferation <- t(as.matrix(Expression[gene_list_proliferation, , drop = FALSE]))
+
+extendScores <- RunEXTEND(as.matrix(Expression))
+
+telomeraseScores <- read_delim("TelomeraseScores.txt")
+
+telomeraseScores <- telomeraseScores[, c("SampleID", "NormEXTENDScores")]
+telomeraseScores <- as.data.frame(telomeraseScores)
+telomeraseScores <- left_join(telomeraseScores, metadata[, c("SampleID", "TMM")], by = "SampleID")
+rownames(telomeraseScores) <- telomeraseScores$SampleID
+telomeraseScores$SampleID = NULL
+
+telomeraseScores[match(rownames(gene_proliferation), rownames(telomeraseScores)), ]
+
+y <- telomeraseScores$NormEXTENDScores
+
+
+cor_values <- numeric(ncol(gene_proliferation))
+p_values   <- numeric(ncol(gene_proliferation))
+
+
+
+for (i in seq_len(ncol(gene_proliferation))) {
+  a <- as.numeric(gene_proliferation[, i])
+  b <- complete.cases(a, y)
+  correlation <- cor.test(a[b], y[b], method = "spearman", exact = FALSE)
+  cor_values[i] <- unname(correlation$estimate)
+  p_values[i]   <- correlation$p.value
+}
+
+cor_results <- data.frame(
+  Gene = colnames(gene_proliferation),
+  estimate = cor_values,
+  p_value = p_values,
+  fdr = p.adjust(p_values, "BH"),
+  stringsAsFactors = FALSE
+)[order(p.adjust(p_values, "BH"), -abs(cor_values)), ]
+
+extend_proliferation_sig <- cor_results[cor_results$fdr < 0.01, ]
+
+############################
+
+##### Proliferation vs. GSVA ADR.
+
+source("DataCleaning.R")
+
+
+adrenergic_markers <- list(ADR = c("PHOX2A", "PHOX2B", "HAND2", "ISL1", "GATA3", "ASCL1", "TBX2", "DBH", "TH"))
+
+
+
+
+# GSVA for adrenergic marker.
+Expression <- as.matrix(Expression)
+adr_gsva <- gsvaParam(Expression, adrenergic_markers, kcdf = "Gaussian")
+GSVA_result_adr <- gsva(adr_gsva)
+GSVA_df_adr <- as.data.frame(GSVA_result_adr)
+GSVA_long_adr <- pivot_longer(GSVA_df_adr, cols = everything(), names_to = "SampleID", values_to = "GSVA_Score")
+
+GSVA_long_adr <- GSVA_long_adr[match(rownames(gene_proliferation), GSVA_long_adr$SampleID), ]
+
+y <- GSVA_long_adr$GSVA_Score
+
+cor_values <- numeric(ncol(gene_proliferation))
+p_values   <- numeric(ncol(gene_proliferation))
+
+
+
+for (i in seq_len(ncol(gene_proliferation))) {
+  a <- as.numeric(gene_proliferation[, i])
+  b <- complete.cases(a, y)
+  correlation <- cor.test(a[b], y[b], method = "spearman", exact = FALSE)
+  cor_values[i] <- unname(correlation$estimate)
+  p_values[i]   <- correlation$p.value
+}
+
+cor_results <- data.frame(
+  Gene = colnames(gene_proliferation),
+  estimate = cor_values,
+  p_value = p_values,
+  fdr = p.adjust(p_values, "BH"),
+  stringsAsFactors = FALSE
+)[order(p.adjust(p_values, "BH"), -abs(cor_values)), ]
+
+adr_proliferation_sig <- cor_results[cor_results$fdr < 0.01, ]
+
+
+##### Proliferation vs. GSVA MES.
+
+source("DataCleaning.R")
+
+mesenchymal_markers <- list(MES = c("PRRX1", "RUNX1", "FOSL1", "JUN", "YAP1", "WWTR1", "MEOX1", "MEOX2",
+                                    "SNAI2", "CD44", "FN1", "VIM"))
+
+
+
+
+# GSVA for mesenchymal marker.
+Expression <- as.matrix(Expression)
+mes_gsva <- gsvaParam(Expression, mesenchymal_markers, kcdf = "Gaussian")
+GSVA_result_mes <- gsva(mes_gsva)
+GSVA_df_mes <- as.data.frame(GSVA_result_mes)
+GSVA_long_mes <- pivot_longer(GSVA_df_mes, cols = everything(), names_to = "SampleID", values_to = "GSVA_Score")
+
+GSVA_long_mes <- GSVA_long_mes[match(rownames(gene_proliferation), GSVA_long_mes$SampleID), ]
+
+y <- GSVA_long_mes$GSVA_Score
+
+cor_values <- numeric(ncol(gene_proliferation))
+p_values   <- numeric(ncol(gene_proliferation))
+
+
+
+for (i in seq_len(ncol(gene_proliferation))) {
+  a <- as.numeric(gene_proliferation[, i])
+  b <- complete.cases(a, y)
+  correlation <- cor.test(a[b], y[b], method = "spearman", exact = FALSE)
+  cor_values[i] <- unname(correlation$estimate)
+  p_values[i]   <- correlation$p.value
+}
+
+cor_results <- data.frame(
+  Gene = colnames(gene_proliferation),
+  estimate = cor_values,
+  p_value = p_values,
+  fdr = p.adjust(p_values, "BH"),
+  stringsAsFactors = FALSE
+)[order(p.adjust(p_values, "BH"), -abs(cor_values)), ]
+
+mes_proliferation_sig <- cor_results[cor_results$fdr < 0.01, ]
+
+
+##########
+
+### cell cycle inhibitor vs. NO_TMM GSVA.
+
+cellCycle_inhibitor <- c("CDKN1A", "CDKN1B", "CDKN1C", "CDKN2A", "CDKN2B", "CDKN2C", "CDKN2D", "TGFB1", "SMAD7", "KLF10",
+                         "FOXO1", "HOPX", "BTG1", "KLF4", "EGR1", "HES1")
+
+# ranks of proliferation gene.
+ExpressionFpkm <- readRDS("TARGET_GEdata_062024.RDS")
+
+
+# Data filtering: only including sample IDs from metadata present in the fpkm dataset & vice-versa.
+metadata <- metadata %>%
+  filter(SampleID %in% colnames(ExpressionFpkm))
+ExpressionFpkm <- ExpressionFpkm[, colnames(ExpressionFpkm) %in% metadata$SampleID, drop = FALSE]
+
+metadata <- metadata %>%
+  arrange(TMM)
+
+ExpressionFpkm <- ExpressionFpkm[, match(metadata$SampleID, colnames(ExpressionFpkm))]
+
+# ranking the genes in ExpressionFpkm.
+ranked_TARGET_NBL <- apply(ExpressionFpkm, 2, function(x) rank(x, ties.method = "average"))
+
+cellCycle_inhibitor <- intersect(cellCycle_inhibitor, rownames(ranked_TARGET_NBL))
+cellCycle_inhibitor_matrix <- t(as.matrix(ranked_TARGET_NBL[cellCycle_inhibitor, , drop = FALSE]))
+
+
+GSVA_long_noTMM <- GSVA_long_noTMM[match(rownames(cellCycle_inhibitor_matrix), GSVA_long_noTMM$SampleID), ]
+
+y <- GSVA_long_noTMM$GSVA_Score
+
+cor_values <- numeric(ncol(cellCycle_inhibitor_matrix))
+p_values   <- numeric(ncol(cellCycle_inhibitor_matrix))
+
+
+
+for (i in seq_len(ncol(cellCycle_inhibitor_matrix))) {
+  a <- as.numeric(cellCycle_inhibitor_matrix[, i])
+  b <- complete.cases(a, y)
+  correlation <- cor.test(a[b], y[b], method = "spearman", exact = FALSE)
+  cor_values[i] <- unname(correlation$estimate)
+  p_values[i]   <- correlation$p.value
+}
+
+cor_results <- data.frame(
+  Gene = colnames(cellCycle_inhibitor_matrix),
+  estimate = cor_values,
+  p_value = p_values,
+  fdr = p.adjust(p_values, "BH"),
+  stringsAsFactors = FALSE
+)[order(p.adjust(p_values, "BH"), -abs(cor_values)), ]
+
+noTMM_inhibitor_sig <- cor_results[cor_results$fdr < 0.01, ]
 
 
 

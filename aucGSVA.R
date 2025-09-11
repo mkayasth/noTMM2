@@ -133,6 +133,8 @@ run_exhaustive_forward_auc <- function(expr_matrix, metadata, candidate_genes,
   list(final_genes = selected_genes, final_auc = best_auc, results = results)
 }
 
+
+
 # result of just forward greedy selection without folds.
 a <- run_exhaustive_forward_auc(expr_matrix = Expression, metadata = metadata, candidate_genes = candidate_genes2, 
                                   phenotype_col = "TMM_Case",
@@ -263,6 +265,8 @@ run_kfold_auc <- function(expr_matrix, metadata, candidate_genes,
   )
 }
 
+
+
 kfold_result <- run_kfold_auc(expr_matrix = Expression,
                               metadata = metadata,
                               candidate_genes = candidate_genes2,
@@ -280,6 +284,28 @@ kfold_result_ <- run_kfold_auc(expr_matrix = Expression,
                               label_two = "NO_TMM",
                               max_genes = 20,
                               k = 5, pivot_gene = "PRR7")
+############
+
+metadata <- metadata %>%
+  mutate(Telomerase = case_when(
+    TMM == "Telomerase" ~ "Telomerase",
+    TRUE ~ "Non-Telomerase"
+  ))
+
+mes_genes <-  c("MEOX1", "WWTR1", "VIM", "CD44", "CBFB", "FOSL2", "MEOX2", "GLIS3", "TBX18", "NR3C1", "PRRX1",
+                          "MEF2D", "BHLHE41", "RUNX2", "IRF1", "NOTCH2", "YAP1", "CREG1", "DCAF6", "FLI1", "RUNX1", "IRF2", "JUN",
+                          "MAML2", "ZFP36L1")
+
+
+
+kfold_result_mes <- run_kfold_auc(expr_matrix = Expression,
+                                  metadata = metadata,
+                                  candidate_genes = mes_genes,
+                                  phenotype_col = "Telomerase",
+                                  label_one = "Non-Telomerase",
+                                  label_two = "Telomerase",
+                                  max_genes = 20,
+                                  k = 5, pivot_gene = "NR3C1")
 
 
 kfold_genes <- unique(c("CPNE8", "PGM2L1", "CNR1", "LIFR", "HOXC9", "SNX16", "HECW2", "ALDH3A2",
@@ -299,3 +325,5 @@ b_ <- run_exhaustive_forward_auc(expr_matrix = Expression, metadata = metadata, 
                                  label_one = "TMM", label_two = "NO_TMM",
                                  max_genes = 20,
                                  pivot_gene = "PRR7")
+
+

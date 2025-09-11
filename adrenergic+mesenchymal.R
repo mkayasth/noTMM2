@@ -10,6 +10,7 @@ library(cmapR)
 library(GSVA)
 library(ComplexHeatmap)
 library(ggpubr)
+library(GSVA)
 
 ExpressionFpkm <- readRDS("TARGET_GEdata_062024.RDS")
 
@@ -1162,6 +1163,70 @@ ggplot(plot_data, aes(x = Group, y = Rank, fill = Group, color = Group)) +
 
 
 
+##########################################################################################################
+
+
+# scatter plot of EXTEND vs. MES GSVA Score.
+
+mes_genes <- list(MES = c("MEOX1", "WWTR1", "VIM", "CD44", "CBFB", "FOSL2", "MEOX2", "GLIS3", "TBX18", "NR3C1", "PRRX1",
+               "MEF2D", "BHLHE41", "RUNX2", "IRF1", "NOTCH2", "YAP1", "CREG1", "DCAF6", "FLI1", "RUNX1", "IRF2", "JUN",
+               "MAML2", "ZFP36L1"))
+
+mes_genes <- list(MES = c(""))
+
+source("DataCleaning.R")
+
+# first calculating GSVA based on these mes genes.
+Expression <- as.matrix(Expression)
+gsva <- gsvaParam(Expression, mes_genes, kcdf = "Gaussian")
+GSVA_result <- gsva(gsva)
+GSVA_df <- as.data.frame(GSVA_result)
+GSVA_long <- pivot_longer(GSVA_df, cols = everything(), names_to = "SampleID", values_to = "GSVA_Score")
+
+
+# Now, running extend on these samples.
+
+source("EXTEND/ComponentAndMarkerFunction.r")
+source("EXTEND/ComponentOneAndMarkerFunction.r")
+source("EXTEND/ComponentTwoAndMarkerFunction.r")
+source("EXTEND/InputData.r")
+source("EXTEND/IterativeRS.r")
+source("EXTEND/IterativeRS.r")
+source("EXTEND/MarkerFunction.r")
+source("EXTEND/RunEXTEND.r")
+
+extendScores <- RunEXTEND(as.matrix(Expression))
+telomeraseScores <- read_delim("TelomeraseScores.txt")
+telomeraseScores <- telomeraseScores[, c("SampleID", "NormEXTENDScores")]
+telomeraseScores <- as.data.frame(telomeraseScores)
+telomeraseScores <- left_join(telomeraseScores, metadata[, c("SampleID", "TMM")], by = "SampleID")
+
+# joining the two results.
+GSVA_long <- left_join(GSVA_long, telomeraseScores, by = "SampleID")
+
+# for scatterplot first computing Pearson correlation value.
+cor_val <- cor(GSVA_long$NormEXTENDScores, GSVA_long$GSVA_Score, method = "pearson")
+r_text <- paste("r =", round(cor_val, 3))
+
+ggplot(GSVA_long, aes(y = NormEXTENDScores, x = GSVA_Score, colour = TMM)) + 
+  scale_color_manual(values = c("ALT" = "darkblue", "Telomerase" = "darkred", "black" = "NO_TMM")) + 
+  geom_point(size = 4, alpha = 0.9) + 
+  labs(x = "GSVA Signature Score From MES Markers", y = "Normalized EXTEND Scores") + 
+  geom_smooth(method = "lm", level = 0.95, se = TRUE, color = "black", fill = "lightgray") + 
+  annotate("text", x = 0.25, y = 1.3, label = r_text, size = 7) +
+  theme_classic() +
+  theme(
+    axis.title.x = element_text(size = 24),
+    axis.title.y = element_text(size = 24),
+    axis.text.x  = element_text(size = 14, face = "bold"),
+    axis.text.y  = element_text(size = 14, face = "bold"),
+    legend.title = element_text(size = 18, face = "bold"),
+    legend.text  = element_text(size = 16),
+    legend.position = c(-0.5, 1.3)
+  )
+
+
+##################################################################################
 
 
 
