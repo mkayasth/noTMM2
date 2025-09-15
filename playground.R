@@ -519,7 +519,7 @@ ggplot(telomeraseScores, aes(x = TMM_Category, y = NormEXTENDScores, fill = TMM_
                      method.args = list(alternative ="two.sided"), size = 6, tip.length = 0.01,
                      label.y = 1.4)
 
-
+#####>>>>>>>>############################################################################
 ##############################################################################################
 
 # heatmap to see the relationship between cell of origin timeline markers and TMM status.
@@ -1007,7 +1007,7 @@ cor_results <- data.frame(
 
 noTMM_proliferation_sig <- cor_results[cor_results$fdr < 0.01, ]
 
-# GSVA Proliferation vs. extend
+### GSVA Proliferation vs. extend
 source("DataCleaning.R")
 
 
@@ -1155,7 +1155,7 @@ mes_proliferation_sig <- cor_results[cor_results$fdr < 0.01, ]
 cellCycle_inhibitor <- c("FOXO1", "BTG1", "CDKN1B", "CDKN2A", "HES1", "EGR1", "CDKN2C", "CDKN2B", "HOPX", "CDKN1A", 
                          "KLF4", "CDKN1C", "TGFB1", "CDKN2D", "SMAD7", "KLF10")
 
-# ranks of proliferation gene.
+# ranks of cell cycle inhibitor gene.
 ExpressionFpkm <- readRDS("TARGET_GEdata_062024.RDS")
 
 
@@ -1225,7 +1225,7 @@ GSVA_df_adr <- as.data.frame(GSVA_result_adr)
 GSVA_long_adr <- pivot_longer(GSVA_df_adr, cols = everything(), names_to = "SampleID", values_to = "GSVA_Score")
 
 
-# ranks of proliferation gene.
+# ranks of chromaffin gene.
 ExpressionFpkm <- readRDS("TARGET_GEdata_062024.RDS")
 
 
@@ -1282,7 +1282,7 @@ chromaffin_genes <- c("DBH", "TH", "CHGA", "DDC", "PNMT")
 
 
 
-# GSVA for adrenergic marker.
+# GSVA for no_TMM marker.
 Expression <- as.matrix(Expression)
 noTMM_gsva <- gsvaParam(Expression, gene_list_noTMM, kcdf = "Gaussian")
 GSVA_result_noTMM <- gsva(noTMM_gsva)
@@ -1290,7 +1290,7 @@ GSVA_df_noTMM <- as.data.frame(GSVA_result_noTMM)
 GSVA_long_noTMM <- pivot_longer(GSVA_df_noTMM, cols = everything(), names_to = "SampleID", values_to = "GSVA_Score")
 
 
-# ranks of proliferation gene.
+# ranks of chromaffin gene.
 ExpressionFpkm <- readRDS("TARGET_GEdata_062024.RDS")
 
 
@@ -1346,7 +1346,7 @@ gene_list_mesenchymal <- list(MES = c("PRRX1", "RUNX1", "FOSL1", "JUN", "YAP1", 
                                           "MEOX2", "SNAI2", "CD44", "FN1", "VIM"))
 scp_genes <- c("CDH19", "PLP1", "ERBB3", "MPZ", "ERBB4")
 
-# GSVA for adrenergic marker.
+# GSVA for MES marker.
 Expression <- as.matrix(Expression)
 mes_gsva <- gsvaParam(Expression, gene_list_mesenchymal, kcdf = "Gaussian")
 GSVA_result_mes <- gsva(mes_gsva)
@@ -1354,7 +1354,7 @@ GSVA_df_mes <- as.data.frame(GSVA_result_mes)
 GSVA_long_mes <- pivot_longer(GSVA_df_mes, cols = everything(), names_to = "SampleID", values_to = "GSVA_Score")
 
 
-# ranks of proliferation gene.
+# ranks of schwann cell markers.
 ExpressionFpkm <- readRDS("TARGET_GEdata_062024.RDS")
 
 
@@ -1418,7 +1418,7 @@ GSVA_df_noTMM <- as.data.frame(GSVA_result_noTMM)
 GSVA_long_noTMM <- pivot_longer(GSVA_df_noTMM, cols = everything(), names_to = "SampleID", values_to = "GSVA_Score")
 
 
-# ranks of proliferation gene.
+# ranks of schwann cell marker gene.
 ExpressionFpkm <- readRDS("TARGET_GEdata_062024.RDS")
 
 
@@ -1482,7 +1482,7 @@ GSVA_df_noTMM <- as.data.frame(GSVA_result_noTMM)
 GSVA_long_noTMM <- pivot_longer(GSVA_df_noTMM, cols = everything(), names_to = "SampleID", values_to = "GSVA_Score")
 
 
-# ranks of proliferation gene.
+# ranks of late neuroblast gene.
 ExpressionFpkm <- readRDS("TARGET_GEdata_062024.RDS")
 
 
@@ -1545,7 +1545,7 @@ telomeraseScores <- telomeraseScores[, c("SampleID", "NormEXTENDScores")]
 telomeraseScores <- as.data.frame(telomeraseScores)
 
 
-# ranks of proliferation gene.
+# ranks of lateNeuroblast gene.
 ExpressionFpkm <- readRDS("TARGET_GEdata_062024.RDS")
 
 
@@ -1592,6 +1592,126 @@ cor_results <- data.frame(
 )[order(p.adjust(p_values, "BH"), -abs(cor_values)), ]
 
 lateNeuroblast_extend_sig <- cor_results[cor_results$fdr < 0.01, ]
+
+### Correlation Late Neuroblast with MES GSVA. :))))
+lateNeuroblast_genes <- c("IL7", "GAP43", "STMN2", "SYN3", "ISL1")
+mesenchymal_markers <- list(MES = c("PRRX1", "RUNX1", "FOSL1", "JUN", "YAP1", "WWTR1", "MEOX1", "MEOX2",
+                                    "SNAI2", "CD44", "FN1", "VIM"))
+
+# GSVA for mesenchymal marker.
+Expression <- as.matrix(Expression)
+mes_gsva <- gsvaParam(Expression, mesenchymal_markers, kcdf = "Gaussian")
+GSVA_result_mes <- gsva(mes_gsva)
+GSVA_df_mes <- as.data.frame(GSVA_result_mes)
+GSVA_long_mes <- pivot_longer(GSVA_df_mes, cols = everything(), names_to = "SampleID", values_to = "GSVA_Score")
+
+
+
+y <- GSVA_long_mes$GSVA_Score
+
+# ranks of late Neuroblast gene.
+ExpressionFpkm <- readRDS("TARGET_GEdata_062024.RDS")
+
+
+# Data filtering: only including sample IDs from metadata present in the fpkm dataset & vice-versa.
+metadata <- metadata %>%
+  filter(SampleID %in% colnames(ExpressionFpkm))
+ExpressionFpkm <- ExpressionFpkm[, colnames(ExpressionFpkm) %in% metadata$SampleID, drop = FALSE]
+
+metadata <- metadata %>%
+  arrange(TMM)
+
+ExpressionFpkm <- ExpressionFpkm[, match(metadata$SampleID, colnames(ExpressionFpkm))]
+
+# ranking the genes in ExpressionFpkm.
+ranked_TARGET_NBL <- apply(ExpressionFpkm, 2, function(x) rank(x, ties.method = "average"))
+
+lateNeuroblast_genes <- intersect(lateNeuroblast_genes, rownames(ranked_TARGET_NBL))
+lateNeuroblast_matrix <- t(as.matrix(ranked_TARGET_NBL[lateNeuroblast_genes, , drop = FALSE]))
+lateNeuroblast_matrix <- lateNeuroblast_matrix[match(GSVA_long_mes$SampleID, rownames(lateNeuroblast_matrix)), ]
+
+
+cor_values <- numeric(ncol(lateNeuroblast_matrix))
+p_values   <- numeric(ncol(lateNeuroblast_matrix))
+
+
+for (i in seq_len(ncol(lateNeuroblast_matrix))) {
+  a <- as.numeric(lateNeuroblast_matrix[, i])
+  b <- complete.cases(a, y)
+  correlation <- cor.test(a[b], y[b], method = "spearman", exact = FALSE)
+  cor_values[i] <- unname(correlation$estimate)
+  p_values[i]   <- correlation$p.value
+}
+
+cor_results <- data.frame(
+  Gene = colnames(lateNeuroblast_matrix),
+  estimate = cor_values,
+  p_value = p_values,
+  fdr = p.adjust(p_values, "BH"),
+  stringsAsFactors = FALSE
+)[order(p.adjust(p_values, "BH"), -abs(cor_values)), ]
+
+mes_lateNeuroblast_sig <- cor_results[cor_results$fdr < 0.01, ]
+
+
+
+### Correlation Late Neuroblast with ADR GSVA.
+
+adrenergic_markers <- list(ADR = c("PHOX2A", "PHOX2B", "HAND2", "ISL1", "GATA3", "ASCL1", "TBX2", "DBH", "TH"))
+lateNeuroblast_genes <- c("IL7", "GAP43", "STMN2", "SYN3", "ISL1")
+
+# GSVA for mesenchymal marker.
+Expression <- as.matrix(Expression)
+adr_gsva <- gsvaParam(Expression, adrenergic_markers, kcdf = "Gaussian")
+GSVA_result_adr <- gsva(adr_gsva)
+GSVA_df_adr <- as.data.frame(GSVA_result_adr)
+GSVA_long_adr <- pivot_longer(GSVA_df_adr, cols = everything(), names_to = "SampleID", values_to = "GSVA_Score")
+
+y <- GSVA_long_mes$GSVA_Score
+
+# ranks of lasteNeuroblast gene.
+ExpressionFpkm <- readRDS("TARGET_GEdata_062024.RDS")
+
+
+# Data filtering: only including sample IDs from metadata present in the fpkm dataset & vice-versa.
+metadata <- metadata %>%
+  filter(SampleID %in% colnames(ExpressionFpkm))
+ExpressionFpkm <- ExpressionFpkm[, colnames(ExpressionFpkm) %in% metadata$SampleID, drop = FALSE]
+
+metadata <- metadata %>%
+  arrange(TMM)
+
+ExpressionFpkm <- ExpressionFpkm[, match(metadata$SampleID, colnames(ExpressionFpkm))]
+
+# ranking the genes in ExpressionFpkm.
+ranked_TARGET_NBL <- apply(ExpressionFpkm, 2, function(x) rank(x, ties.method = "average"))
+
+lateNeuroblast_genes <- intersect(lateNeuroblast_genes, rownames(ranked_TARGET_NBL))
+lateNeuroblast_matrix <- t(as.matrix(ranked_TARGET_NBL[lateNeuroblast_genes, , drop = FALSE]))
+lateNeuroblast_matrix <- lateNeuroblast_matrix[match(GSVA_long_mes$SampleID, rownames(lateNeuroblast_matrix)), ]
+
+
+cor_values <- numeric(ncol(lateNeuroblast_matrix))
+p_values   <- numeric(ncol(lateNeuroblast_matrix))
+
+
+for (i in seq_len(ncol(lateNeuroblast_matrix))) {
+  a <- as.numeric(lateNeuroblast_matrix[, i])
+  b <- complete.cases(a, y)
+  correlation <- cor.test(a[b], y[b], method = "spearman", exact = FALSE)
+  cor_values[i] <- unname(correlation$estimate)
+  p_values[i]   <- correlation$p.value
+}
+
+cor_results <- data.frame(
+  Gene = colnames(lateNeuroblast_matrix),
+  estimate = cor_values,
+  p_value = p_values,
+  fdr = p.adjust(p_values, "BH"),
+  stringsAsFactors = FALSE
+)[order(p.adjust(p_values, "BH"), -abs(cor_values)), ]
+
+adr_lateNeuroblast_sig <- cor_results[cor_results$fdr < 0.01, ]
 
 
 
@@ -1674,7 +1794,7 @@ GSVA_long <- pivot_longer(GSVA_df, cols = everything(), names_to = "SampleID", v
 
 GSVA_long <- merge(GSVA_long, metadata[, c("SampleID", "TMM", "COG.Risk.Group")], by = "SampleID")
 
-# boxplot: cell cycle inhibitors vs. TMM.
+# boxplot: scp gsva vs. TMM.
 ggplot(GSVA_long, aes(x = TMM, y = GSVA_Score, fill = TMM, color = TMM)) +
   geom_boxplot(size = 0.2, alpha = 0.5, outlier.shape = NA) +
   geom_point(position = position_jitter(width = 0.2), size = 3) +
@@ -1790,9 +1910,7 @@ ggplot(GSVA_long, aes(x = COG.Risk.Group, y = GSVA_Score, fill = COG.Risk.Group,
                      label.y = 1.4)
 
 
-### Correlation Late Neuroblast with ADR GSVA.
-### Correlation Late Neuroblast with MES GSVA.
-
+#############>>>>>>###############################
 
 
 
