@@ -82,7 +82,8 @@ ggplot(GSVA_long_proliferation, aes(y = NormEXTENDScores, x = GSVA_Score, colour
 ## scatterplot: scp gsva vs. NO_TMM GSVA.
 source("DataCleaning.R")
 gene_set_list_scp <- list("SCP" = c("PLP1", "MPZ", "CDH19", "ERBB3", "ERBB4"))
-gene_list_noTMM <- list("NO_TMM Genes" = c("CPNE8", "PGM2L1", "LIFR", "CNR1", "HECW2", "CPNE3", "HOXC9", "SNX16", "IGSF10"))
+gene_list_noTMM <- list("NO_TMM Genes" = c("CPNE8", "PGM2L1", "CNR1", "LIFR", "HOXC9", "SNX16", "HECW2", "ALDH3A2",
+                                           "THSD7A", "CPNE3", "IGSF10"))
 
 
 gsvapar <- gsvaParam(as.matrix(Expression), gene_set_list_scp, kcdf = "Gaussian")
@@ -263,7 +264,8 @@ ggplot(GSVA_long_mes, aes(y = GSVA_Score_Mes, x = GSVA_Score_SCP, colour = COG.R
 
 #### scatterplot: MES vs. NO_TMM.
 gene_list_mesenchymal <- list("MES" = c("FN1", "VIM", "SNAI2", "PRRX1", "YAP1", "WWTR1"))
-gene_list_noTMM <- list("NO_TMM Genes" = c("CPNE8", "PGM2L1", "LIFR", "CNR1", "HECW2", "CPNE3", "HOXC9", "SNX16", "IGSF10"))
+gene_list_noTMM <- list("NO_TMM Genes" = c("CPNE8", "PGM2L1", "CNR1", "LIFR", "HOXC9", "SNX16", "HECW2", "ALDH3A2",
+                                           "THSD7A", "CPNE3", "IGSF10"))
 
 
 gsvapar <- gsvaParam(as.matrix(Expression), gene_list_mesenchymal, kcdf = "Gaussian")
@@ -324,8 +326,9 @@ ggplot(GSVA_long_mes, aes(y = GSVA_Score_mes, x = GSVA_Score, colour = COG.Risk.
 
 
 #### scatterplot: early neuroblast vs. NO_TMM.
-early_neuroblast <- list("earlyNeuroblast" = c("ALK", "TOP2A", "MKI67"))
-gene_list_noTMM <- list("NO_TMM Genes" = c("CPNE8", "PGM2L1", "LIFR", "CNR1", "HECW2", "CPNE3", "HOXC9", "SNX16", "IGSF10"))
+early_neuroblast <- list("earlyNeuroblast" = c("ALK", "TOP2A", "MKI67", "ISL1", "STMN2"))
+gene_list_noTMM <- list("NO_TMM Genes" = c("CPNE8", "PGM2L1", "CNR1", "LIFR", "HOXC9", "SNX16", "HECW2", "ALDH3A2",
+                                           "THSD7A", "CPNE3", "IGSF10"))
 
 
 gsvapar <- gsvaParam(as.matrix(Expression), early_neuroblast, kcdf = "Gaussian")
@@ -389,7 +392,7 @@ ggplot(GSVA_long_neuroblast, aes(y = GSVA_Score_neuroblast, x = GSVA_Score, colo
 #### scatterplot: early neuroblast vs. EXTEND.
 source("DataCleaning.R")
 
-early_neuroblast <- list("earlyNeuroblast" = c("ALK", "TOP2A", "MKI67"))
+early_neuroblast <- list("earlyNeuroblast" = c("ALK", "TOP2A", "MKI67", "ISL1", "STMN2"))
 
 gsvapar <- gsvaParam(as.matrix(Expression), early_neuroblast, kcdf = "Gaussian")
 gsva_result <- gsva(gsvapar)
@@ -635,7 +638,8 @@ gsva_result <- gsva(gsvapar)
 GSVA_df <- as.data.frame(gsva_result)
 GSVA_long_chromaffin <- pivot_longer(GSVA_df, cols = everything(), names_to = "SampleID", values_to = "GSVA_Score_chromaffin")
 
-gene_list_noTMM <- list("NO_TMM Genes" = c("CPNE8", "PGM2L1", "LIFR", "CNR1", "HECW2", "CPNE3", "HOXC9", "SNX16", "IGSF10"))
+gene_list_noTMM <- list("NO_TMM Genes" = c("CPNE8", "PGM2L1", "CNR1", "LIFR", "HOXC9", "SNX16", "HECW2", "ALDH3A2",
+                                           "THSD7A", "CPNE3", "IGSF10"))
 Expression <- as.matrix(Expression)
 noTMM_gsva <- gsvaParam(Expression, gene_list_noTMM, kcdf = "Gaussian")
 GSVA_result_noTMM <- gsva(noTMM_gsva)
@@ -717,7 +721,8 @@ ggplot(GSVA_long_mes, aes(y = GSVA_Score_Mes, x = NormEXTENDScores, colour = TMM
 source("DataCleaning.R")
 gene_list_adrenergic <- list("ADR" = c("DLK1", "DBH", "PHOX2A", "PHOX2B", "GATA2", "GATA3"))
 
-gene_list_noTMM <- list("NO_TMM Genes" = c("CPNE8", "PGM2L1", "LIFR", "CNR1", "HECW2", "CPNE3", "HOXC9", "SNX16", "IGSF10"))
+gene_list_noTMM <- list("NO_TMM Genes" = c("CPNE8", "PGM2L1", "CNR1", "LIFR", "HOXC9", "SNX16", "HECW2", "ALDH3A2",
+                                           "THSD7A", "CPNE3", "IGSF10"))
 
 Expression <- as.matrix(Expression)
 noTMM_gsva <- gsvaParam(Expression, gene_list_noTMM, kcdf = "Gaussian")

@@ -40,7 +40,7 @@ cluster_means <- aggregate(GSVA_df, by = list(cluster = km_res$cluster), FUN = m
 
 clusters <- km_res$cluster
 
-# Pick a color palette (1 color per cluster)
+# color palette for cluster.
 colors <- rainbow(length(unique(clusters)))
 
 
@@ -59,15 +59,6 @@ gene_sets_phenotype <- list(
   MES = c("VIM", "FN1", "YAP1", "SNAI2", "PRRX1", "WWTR1")
 )
 
-gene_sets_phenotype <- list(
-  ADR = c("KLF7", "GATA3", "HAND2", "PHOX2A", "ISL1", "HAND1",
-          "PHOX2B", "TFAP2B", "GATA2", "SATB1", "SIX3", "EYA1",
-          "SOX11", "DACH1", "ASCL1", "HEY1", "KLF13", "PBX3"),
-  MES = c("VIM", "FN1", "MEOX2", "ID1", "EGR3", "AEBP1", "CBFB", "IRF3", "IRF2", "IRF1", 
-          "TBX18", "MAFF", "RUNX2", "ZFP36L1", "NR3C1", "BHLHE41", "GLIS3", "RUNX1", "FOSL1",
-          "FOSL2", "ELK4", "IFI16", "SIX4", "FLI1", "MAML2", "SMAD3", "DCAF6", "WWTR1", "SOX9", 
-          "MEF2D", "ZNF217", "PRRX1", "CREG1", "NOTCH2", "SIX1", "MEOX1"))
-
 
 source("DataCleaning.R")
 
@@ -82,27 +73,27 @@ GSVA_df_scaled <- scale(GSVA_df)
 ###
 
 # umap and kmeans.
-umap_res <- umap(GSVA_df_scaled)
 set.seed(123)
-km_res <- kmeans(umap_res, centers = 4, nstart = 50)
+umap_res2 <- umap(GSVA_df_scaled)
+km_res2 <- kmeans(umap_res2, centers = 4, nstart = 50)
 
 
 ###
 
 # Labeling cluster by dominant cell of origin.
-cluster_means <- aggregate(GSVA_df, by = list(cluster = km_res$cluster), FUN = mean)
+cluster_means2 <- aggregate(GSVA_df, by = list(cluster = km_res2$cluster), FUN = mean)
 
 
-clusters <- km_res$cluster
+clusters2 <- km_res2$cluster
 
 
-colors <- rainbow(length(unique(clusters)))
+colors <- rainbow(length(unique(clusters2)))
 
 
-plot(umap_res, col = colors[clusters], pch = 19,
+plot(umap_res2, col = colors[clusters2], pch = 19,
      xlab = "UMAP 1", ylab = "UMAP 2",
      main = "K-means clusters on GSVA scores")
 legend("topright", 
-       legend = paste("Cluster", sort(unique(clusters))), 
+       legend = paste("Cluster", sort(unique(clusters2))), 
        col = colors, pch = 19)
 

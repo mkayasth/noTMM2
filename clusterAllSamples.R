@@ -25,6 +25,8 @@ ExpressionFpkm <- ExpressionFpkm[, match(metadata$SampleID, colnames(ExpressionF
 # ranking the genes in ExpressionFpkm.
 ranked_TARGET_NBL <- apply(ExpressionFpkm, 2, function(x) rank(x, ties.method = "average"))
 
+source("DGE-Limma.R") # for candidate_genes.
+
 ## only looking at the DGE genes -- common in NO_TMM vs. ALT and NO_TMM vs. Telomerase.
 ranked_TARGET_NBL <- ranked_TARGET_NBL[candidate_genes, ]
 
@@ -180,91 +182,6 @@ text(umap_res[noTMM_idx, 1], umap_res[noTMM_idx, 2],
 
 ######################################################################################
 
-## using DGE between High Risk and Low Risk, separating NO_TMM.
-
-ExpressionFpkm <- readRDS("TARGET_GEdata_062024.RDS")
-metadata <- read.table(file = 'Metadata_TARGETFinal_08012024.txt', header = TRUE, sep = '\t')
-
-# Data filtering: only including sample IDs from metadata present in the fpkm dataset & vice-versa.
-metadata <- metadata %>%
-  filter(SampleID %in% colnames(ExpressionFpkm))
-
-metadata <- metadata %>%
-  filter(TMM == "NO_TMM")
-
-metadata <- metadata %>%
-  arrange(COG.Risk.Group)
-
-ExpressionFpkm <- ExpressionFpkm[, colnames(ExpressionFpkm) %in% metadata$SampleID, drop = FALSE]
-
-ExpressionFpkm <- ExpressionFpkm[, match(metadata$SampleID, colnames(ExpressionFpkm))]
-
-# ranking the genes in ExpressionFpkm.
-ranked_TARGET_NBL <- apply(ExpressionFpkm, 2, function(x) rank(x, ties.method = "average"))
-
-## only looking at highRisk$Genes.
-ranked_TARGET_NBL <- ranked_TARGET_NBL[regression_results_sig_highRisk$Gene, ] # from DGELimma.R.
-
-
-
-#### Now making the clusters only based on these candidate genes.
-
-# Scale and transpose first.
-pca_scale <- scale(t(ranked_TARGET_NBL))
-
-# Run PCA
-pca_result <- prcomp(pca_scale, center = TRUE, scale. = TRUE)
-
-# plotting the visualize the variance.
-pca_var <- pca_result$sdev^2
-pca_var_explained <- pca_var / sum(pca_var)
-
-
-# Make full scree plot to identify plateau.
-plot(pca_var_explained * 100, type = "b", pch = 19,
-     xlab = "Principal Component",
-     ylab = "Variance Explained (%)",
-     main = "Scree Plot: Full PCA")
-
-# From the elbow plot, graph seems to plateau at PC:1-5.
-pc_scores <- pca_result$x[, 1:5]
-
-##### Clustering the whole expression data.
-# k-means clustering.
-set.seed(123)
-umap_res <- umap(pc_scores)
-
-km_res <- kmeans(umap_res, centers = 2)
-
-# Plotting with clusters.
-tmm_colors <- c("High Risk" = "red", "Low Risk" = "green", "Intermediate Risk" = "green")
-
-plot(umap_res, col = tmm_colors[metadata$COG.Risk.Group], pch = 19,
-     xlab = "UMAP 1", ylab = "UMAP 2", main = "k-means Clusters on UMAP")
-
-
-
-clusters_tmm <- as.data.frame(km_res$cluster)
-clusters_tmm$SampleID <- rownames(clusters_tmm)
-rownames(clusters_tmm) <- NULL
-
-clusters_tmm <- left_join(clusters_tmm, metadata[, c("SampleID", "TMM", "TMM_Case", "MYCN.status", "COG.Risk.Group")], by = "SampleID")
-
-
-# Labeling NO_TMM high-risk samples.
-
-plot(umap_res, col = tmm_colors[metadata$COG.Risk.Group], pch = 19,
-     xlab = "UMAP 1", ylab = "UMAP 2", main = "k-means Clusters on UMAP")
-
-
-noTMM_idx <- c("TARGET.30.PALCBW.01A", "TARGET.30.PASPER.01A", "TARGET.30.PASJZC.01A") #samples not following the trend.
-idx <- match(noTMM_idx, metadata$SampleID)
-
-text(umap_res[idx, 1], umap_res[idx, 2], 
-     labels = metadata$SampleID[idx], 
-     pos = 3, cex = 0.7, col = "black")
-
-### not the most distinct cluster.
 
 ##########################################################################################
 
@@ -288,7 +205,7 @@ ExpressionFpkm <- ExpressionFpkm[, match(metadata$SampleID, colnames(ExpressionF
 ranked_TARGET_NBL <- apply(ExpressionFpkm, 2, function(x) rank(x, ties.method = "average"))
 
 gene_list_together <- c("CPNE8", "PGM2L1", "LIFR", "CNR1", "HECW2", "CPNE3", "HOXC9", "SNX16", "IGSF10",
-                                           "PRR7", "IGLV6-57", "SAC3D1", "CCDC86", "DDN")
+                                           "PRR7", "IGLV6-57", "SAC3D1", "CCDC86", "DDN") # from aucGSVA: genes most upregulated and downregulated in NO_TMM.
 
 
 ## only looking at the DGE genes -- common in NO_TMM vs. ALT and NO_TMM vs. Telomerase.
@@ -315,8 +232,8 @@ plot(pca_var_explained * 100, type = "b", pch = 19,
      ylab = "Variance Explained (%)",
      main = "Scree Plot: Full PCA")
 
-# From the elbow plot, graph seems to plateau at PC:1-2.
-pc_scores <- pca_result$x[, 1:2]
+# From the elbow plot, graph seems to plateau at PC:1-4.
+pc_scores <- pca_result$x[, 1:4]
 
 ##### Clustering the whole expression data.
 
@@ -394,7 +311,7 @@ plot(umap_res, col = tmm_colors[metadata$TMM_Case], pch = 19,
      xlab = "UMAP 1", ylab = "UMAP 2", main = "k-means Clusters on UMAP")
 
 
-# clustering based on expression  does not really work...
+# clustering based on log expression  does not really work...
 
 ########################################################################################
 
@@ -467,7 +384,7 @@ text(umap_res[noTMM_idx, 1], umap_res[noTMM_idx, 2],
 
 ###################################################################################
 
-# clustering samples based on MES markers -- divide samples hopefully into MES, ADR and intermediate samples.
+# clustering samples based on MES & ADR markers -- divide samples hopefully into MES, ADR and intermediate samples.
 ExpressionFpkm <- readRDS("TARGET_GEdata_062024.RDS")
 
 
@@ -485,9 +402,11 @@ ExpressionFpkm <- ExpressionFpkm[, match(metadata$SampleID, colnames(ExpressionF
 # ranking the genes in ExpressionFpkm.
 ranked_TARGET_NBL <- apply(ExpressionFpkm, 2, function(x) rank(x, ties.method = "average"))
 
-mes_genes <- c("MEOX1", "WWTR1", "VIM", "CD44", "CBFB", "FOSL2", "MEOX2", "GLIS3", "TBX18", "NR3C1",
-                          "PRRX1", "MEF2D", "BHLHE41", "RUNX2", "IRF1", "NOTCH2", "YAP1", "CREG1", "DCAF6", "FLI1",
-                          "RUNX1", "IRF2", "JUN", "MAML2", "ZFP36L1")
+# #mes_genes <- c("MEOX1", "WWTR1", "VIM", "CD44", "CBFB", "FOSL2", "MEOX2", "GLIS3", "TBX18", "NR3C1",
+#                           "PRRX1", "MEF2D", "BHLHE41", "RUNX2", "IRF1", "NOTCH2", "YAP1", "CREG1", "DCAF6", "FLI1",
+#                           "RUNX1", "IRF2", "JUN", "MAML2", "ZFP36L1")
+
+mes_genes <- c("FN1", "VIM", "SNAI2", "PRRX1", "YAP1", "WWTR1", "DLK1", "DBH", "PHOX2A", "PHOX2B", "GATA2", "GATA3")
 
 ## only looking at the MES markers correlated with EXTEND scores.
 ranked_TARGET_NBL <- ranked_TARGET_NBL[mes_genes, ]
@@ -525,19 +444,16 @@ umap_res <- umap(pc_scores)
 
 km_res <- kmeans(umap_res, centers = 3)
 
+colors <- rainbow(length(unique(km_res$cluster)))
 
-
-colors <- rep("gray", nrow(umap_res))
-
-# Color samples
-colors[rownames(umap_res) %in% c1] <- "blue"
-colors[rownames(umap_res) %in% c2] <- "red"
 
 # Plot UMAP with colors
 plot(umap_res, col = km_res$cluster, pch = 19,
      xlab = "UMAP 1", ylab = "UMAP 2",
      main = "k-means Clusters on UMAP")
-
+legend("topright", 
+       legend = paste("Cluster", sort(unique(km_res$cluster))), 
+       col = colors, pch = 19)
 
 
 

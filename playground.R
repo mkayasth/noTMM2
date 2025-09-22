@@ -294,136 +294,136 @@ ggplot(GSVA_long_, aes(x = TMM_Case, y = GSVA_Score, fill = TMM_Case, color = TM
 
 
 ############################################################################################
-
-# t-test for gsva signature genes between NO_TMM clusters.
-source('clusterAllSamples.R')
-
-clusters_target <- as.data.frame(km_res_sig$cluster)
-colnames(clusters_target) <- c("Cluster")
-
-clusters_target <- clusters_target[rownames(clusters_target) %in% metadata$SampleID[metadata$TMM == "NO_TMM"], , drop = FALSE]
-signature_genes <- c("CPNE8", "PGM2L1", "LIFR", "CNR1", "HECW2", "CPNE3", "HOXC9", "SNX16", "IGSF10", "PRR7", "IGLV6-57", "SAC3D1", "CCDC86", "DDN")
-
-# now running t-test for these genes across the two clusters. Need to filter out genes that are statistically different.
-
-##### 2) t-test of the DEGs.
-# Initializing an empty data frame for storing t-test results.
-dge_gene <- Expression[rownames(Expression) %in% signature_genes, ,drop = FALSE]
-
-t_test_results <- data.frame(
-  Gene = character(),
-  p_value_t_test = numeric(),
-  stringsAsFactors = FALSE
-)
-
-
-# Looping through each gene in dge_gene.
-for (i in 1:length(signature_genes)) {
-  
-  gene_id <- signature_genes[i]
-  
-  
-  # Extracting the expression values for this gene, keeping it as a matrix. We are only selecting significant genes (all samples for this gene).
-  gene_Expression <- dge_gene[rownames(dge_gene) == gene_id, , drop = FALSE]
-  
-  # Creating C1 and C2 group. For the gene we are working with, all NO_TMM sample expression data placed in c1_group and c2_group based on their cluster.
-  c1_group <- gene_Expression[, clusters_target == 1, drop = FALSE]
-  c2_group <- gene_Expression[, clusters_target == 2, drop = FALSE]
-  
-  # for a gene, compare c1 and c2 samples.
-  t_test <- t.test(c1_group, c2_group)
-  p_value_t_test <- t_test$p.value
-  
-  
-  # Storing the results.
-  t_test_results <- rbind(t_test_results, data.frame(
-    Gene = gene_id,
-    p_value_t_test = p_value_t_test
-  ))
-  
-  
-  
-  # removing un-required intermediates formed while forming the t-test table above.
-  rm(gene_id)
-  rm(gene_Expression)
-  rm(c1_group)
-  rm(c2_group)
-  rm(p_value_t_test)
-  rm(t_test)
-}
-
-# filtering to only maintain genes where p-value is greater than 0.1.
-t_test_results <- t_test_results[t_test_results$p_value_t_test > 0.1, ]
-
-# remaining 9 genes -- clustering based on these 9 genes.
-
-source("DataCleaning.R")
-ExpressionFpkm <- readRDS("TARGET_GEdata_062024.RDS")
-
-
-# Data filtering: only including sample IDs from metadata present in the fpkm dataset & vice-versa.
-metadata <- metadata %>%
-  filter(SampleID %in% colnames(ExpressionFpkm))
-ExpressionFpkm <- ExpressionFpkm[, colnames(ExpressionFpkm) %in% metadata$SampleID, drop = FALSE]
-
-metadata <- metadata %>%
-  arrange(TMM)
-
-ExpressionFpkm <- ExpressionFpkm[, match(metadata$SampleID, colnames(ExpressionFpkm))]
-
-# ranking the genes in ExpressionFpkm.
-ranked_TARGET_NBL <- apply(ExpressionFpkm, 2, function(x) rank(x, ties.method = "average"))
-
-gene_list_together <- t_test_results$Gene
-
-
-## only looking at the DGE genes -- common in NO_TMM vs. ALT and NO_TMM vs. Telomerase.
-ranked_TARGET_NBL <- ranked_TARGET_NBL[gene_list_together, ]
-
-##########################################################################################
-
-#### Now making the clusters only based on these candidate genes.
-
-# Scale and transpose first.
-pca_scale <- scale(t(ranked_TARGET_NBL))
-
-# Run PCA
-pca_result <- prcomp(pca_scale, center = TRUE, scale. = TRUE)
-
-# plotting the visualize the variance.
-pca_var <- pca_result$sdev^2
-pca_var_explained <- pca_var / sum(pca_var)
-
-
-# Make full scree plot to identify plateau.
-plot(pca_var_explained * 100, type = "b", pch = 19,
-     xlab = "Principal Component",
-     ylab = "Variance Explained (%)",
-     main = "Scree Plot: Full PCA")
-
-# From the elbow plot, graph seems to plateau at PC:1-2.
-pc_scores <- pca_result$x[, 1:2]
-
-##### Clustering the whole expression data.
-
-# k-means clustering.
-set.seed(123)
-umap_res <- umap(pc_scores)
-
-km_res_sig <- kmeans(umap_res, centers = 2)
-
-# Plotting with clusters.
-tmm_colors <- c("Telomerase" = "red", "ALT" = "blue", "NO_TMM" = "green")
-
-plot(umap_res, col = tmm_colors[metadata$TMM], pch = 19,
-     xlab = "UMAP 1", ylab = "UMAP 2", main = "k-means Clusters on UMAP")
-
-
-noTMM_idx <- which(metadata$TMM == "NO_TMM" & metadata$COG.Risk.Group == "High Risk")
-
-text(umap_res[noTMM_idx, 1], umap_res[noTMM_idx, 2], 
-     labels = metadata$SampleID[noTMM_idx], 
-     pos = 3, cex = 0.7, col = "black")
+# 
+# # t-test for gsva signature genes between NO_TMM clusters.
+# source('clusterAllSamples.R')
+# 
+# clusters_target <- as.data.frame(km_res_sig$cluster)
+# colnames(clusters_target) <- c("Cluster")
+# 
+# clusters_target <- clusters_target[rownames(clusters_target) %in% metadata$SampleID[metadata$TMM == "NO_TMM"], , drop = FALSE]
+# signature_genes <- c("CPNE8", "PGM2L1", "LIFR", "CNR1", "HECW2", "CPNE3", "HOXC9", "SNX16", "IGSF10", "PRR7", "IGLV6-57", "SAC3D1", "CCDC86", "DDN")
+# 
+# # now running t-test for these genes across the two clusters. Need to filter out genes that are statistically different.
+# 
+# ##### 2) t-test of the DEGs.
+# # Initializing an empty data frame for storing t-test results.
+# dge_gene <- Expression[rownames(Expression) %in% signature_genes, ,drop = FALSE]
+# 
+# t_test_results <- data.frame(
+#   Gene = character(),
+#   p_value_t_test = numeric(),
+#   stringsAsFactors = FALSE
+# )
+# 
+# 
+# # Looping through each gene in dge_gene.
+# for (i in 1:length(signature_genes)) {
+#   
+#   gene_id <- signature_genes[i]
+#   
+#   
+#   # Extracting the expression values for this gene, keeping it as a matrix. We are only selecting significant genes (all samples for this gene).
+#   gene_Expression <- dge_gene[rownames(dge_gene) == gene_id, , drop = FALSE]
+#   
+#   # Creating C1 and C2 group. For the gene we are working with, all NO_TMM sample expression data placed in c1_group and c2_group based on their cluster.
+#   c1_group <- gene_Expression[, clusters_target == 1, drop = FALSE]
+#   c2_group <- gene_Expression[, clusters_target == 2, drop = FALSE]
+#   
+#   # for a gene, compare c1 and c2 samples.
+#   t_test <- t.test(c1_group, c2_group)
+#   p_value_t_test <- t_test$p.value
+#   
+#   
+#   # Storing the results.
+#   t_test_results <- rbind(t_test_results, data.frame(
+#     Gene = gene_id,
+#     p_value_t_test = p_value_t_test
+#   ))
+#   
+#   
+#   
+#   # removing un-required intermediates formed while forming the t-test table above.
+#   rm(gene_id)
+#   rm(gene_Expression)
+#   rm(c1_group)
+#   rm(c2_group)
+#   rm(p_value_t_test)
+#   rm(t_test)
+# }
+# 
+# # filtering to only maintain genes where p-value is greater than 0.1.
+# t_test_results <- t_test_results[t_test_results$p_value_t_test > 0.1, ]
+# 
+# # remaining 9 genes -- clustering based on these 9 genes.
+# 
+# source("DataCleaning.R")
+# ExpressionFpkm <- readRDS("TARGET_GEdata_062024.RDS")
+# 
+# 
+# # Data filtering: only including sample IDs from metadata present in the fpkm dataset & vice-versa.
+# metadata <- metadata %>%
+#   filter(SampleID %in% colnames(ExpressionFpkm))
+# ExpressionFpkm <- ExpressionFpkm[, colnames(ExpressionFpkm) %in% metadata$SampleID, drop = FALSE]
+# 
+# metadata <- metadata %>%
+#   arrange(TMM)
+# 
+# ExpressionFpkm <- ExpressionFpkm[, match(metadata$SampleID, colnames(ExpressionFpkm))]
+# 
+# # ranking the genes in ExpressionFpkm.
+# ranked_TARGET_NBL <- apply(ExpressionFpkm, 2, function(x) rank(x, ties.method = "average"))
+# 
+# gene_list_together <- t_test_results$Gene
+# 
+# 
+# ## only looking at the DGE genes -- common in NO_TMM vs. ALT and NO_TMM vs. Telomerase.
+# ranked_TARGET_NBL <- ranked_TARGET_NBL[gene_list_together, ]
+# 
+# ##########################################################################################
+# 
+# #### Now making the clusters only based on these candidate genes.
+# 
+# # Scale and transpose first.
+# pca_scale <- scale(t(ranked_TARGET_NBL))
+# 
+# # Run PCA
+# pca_result <- prcomp(pca_scale, center = TRUE, scale. = TRUE)
+# 
+# # plotting the visualize the variance.
+# pca_var <- pca_result$sdev^2
+# pca_var_explained <- pca_var / sum(pca_var)
+# 
+# 
+# # Make full scree plot to identify plateau.
+# plot(pca_var_explained * 100, type = "b", pch = 19,
+#      xlab = "Principal Component",
+#      ylab = "Variance Explained (%)",
+#      main = "Scree Plot: Full PCA")
+# 
+# # From the elbow plot, graph seems to plateau at PC:1-2.
+# pc_scores <- pca_result$x[, 1:2]
+# 
+# ##### Clustering the whole expression data.
+# 
+# # k-means clustering.
+# set.seed(123)
+# umap_res <- umap(pc_scores)
+# 
+# km_res_sig <- kmeans(umap_res, centers = 2)
+# 
+# # Plotting with clusters.
+# tmm_colors <- c("Telomerase" = "red", "ALT" = "blue", "NO_TMM" = "green")
+# 
+# plot(umap_res, col = tmm_colors[metadata$TMM], pch = 19,
+#      xlab = "UMAP 1", ylab = "UMAP 2", main = "k-means Clusters on UMAP")
+# 
+# 
+# noTMM_idx <- which(metadata$TMM == "NO_TMM" & metadata$COG.Risk.Group == "High Risk")
+# 
+# text(umap_res[noTMM_idx, 1], umap_res[noTMM_idx, 2], 
+#      labels = metadata$SampleID[noTMM_idx], 
+#      pos = 3, cex = 0.7, col = "black")
 
 
 #######################################################################################
@@ -531,7 +531,7 @@ source("DataCleaning.R")
 scp <- c("CDH19", "PLP1", "ERBB3", "MPZ", "ERBB4")
 chromaffin <- c("TH", "DBH", "DDC", "CHGA", "PNMT")
 neuroblast <- c("NEFM", "GAP43", "STMN2", "ISL1")
-early_neuroblast <- c("ALK")
+early_neuroblast <- c("MKI67", "TOP2A", "ALK", "ISL1", "STMN2")
 late_neuroblast <- c("SYN3", "IL7", "GAP43", "STMN2", "ISL1")
 bridge <- c("ERBB4", "ASCL1", "CDH9", "CTTNBP2")
 proliferation <- c("MKI67", "PCNA", "BIRC5", "CEP55", "TOP2A", "CDK1", "CDC20", "CCNB1", "CCNB2", "CCNA2", 

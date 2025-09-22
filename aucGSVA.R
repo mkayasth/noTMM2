@@ -140,13 +140,13 @@ a <- run_exhaustive_forward_auc(expr_matrix = Expression, metadata = metadata, c
                                   phenotype_col = "TMM_Case",
                                   label_one = "NO_TMM", label_two = "TMM",
                                   max_genes = 20,
-                                  pivot_gene = "CPNE8")
+                                  pivot_gene = "CPNE8") #cpne8 is the most upregulated NO_TMM sample.
 
 a_ <- run_exhaustive_forward_auc(expr_matrix = Expression, metadata = metadata, candidate_genes = candidate_genes2, 
                                  phenotype_col = "TMM_Case",
                                  label_one = "TMM", label_two = "NO_TMM",
                                  max_genes = 20,
-                                 pivot_gene = "PRR7")
+                                 pivot_gene = "PRR7") #prr7 is the most downregulated NO_TMM sample.
   
 #########################################################################################################
 
@@ -284,7 +284,9 @@ kfold_result_ <- run_kfold_auc(expr_matrix = Expression,
                               label_two = "NO_TMM",
                               max_genes = 20,
                               k = 5, pivot_gene = "PRR7")
-############
+####################
+
+
 
 metadata <- metadata %>%
   mutate(Telomerase = case_when(
@@ -295,6 +297,10 @@ metadata <- metadata %>%
 mes_genes <-  c("MEOX1", "WWTR1", "VIM", "CD44", "CBFB", "FOSL2", "MEOX2", "GLIS3", "TBX18", "NR3C1", "PRRX1",
                           "MEF2D", "BHLHE41", "RUNX2", "IRF1", "NOTCH2", "YAP1", "CREG1", "DCAF6", "FLI1", "RUNX1", "IRF2", "JUN",
                           "MAML2", "ZFP36L1")
+
+
+# from correlation studies, NO_TMM has relations with mesenchymal features. NR3C1 with the highest correlation. 
+# If the relationship is indeed true, finding which combination of MES genes gives the best separation with NO_TMM and TMM.
 
 
 
