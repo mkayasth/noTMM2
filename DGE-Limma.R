@@ -416,6 +416,8 @@ EnhancedVolcano(noTMM_results,
 
 ##########################################################################################
 
+source("DataCleaning.R")
+
 ##### 1) differential expression: NO_TMM vs. Telomerase.
 
 metadata_Telomerase <- metadata[metadata$TMM == "Telomerase" | metadata$TMM == "NO_TMM", ]

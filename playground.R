@@ -530,7 +530,6 @@ source("DataCleaning.R")
 
 scp <- c("CDH19", "PLP1", "ERBB3", "MPZ", "ERBB4")
 chromaffin <- c("TH", "DBH", "DDC", "CHGA", "PNMT")
-neuroblast <- c("NEFM", "GAP43", "STMN2", "ISL1")
 early_neuroblast <- c("MKI67", "TOP2A", "ALK", "ISL1", "STMN2")
 late_neuroblast <- c("SYN3", "IL7", "GAP43", "STMN2", "ISL1")
 bridge <- c("ERBB4", "ASCL1", "CDH9", "CTTNBP2")
@@ -544,17 +543,16 @@ expression_matrix <- t(scale(t(Expression[rownames(Expression) %in% c( "GAP43", 
 
 # Running GSVA.
 
-gene_set_list_adrenergic <-list(ADRN = c("PHOX2A", "PHOX2B", "HAND2", "ISL1", "GATA3", "ASCL1", "TBX2", "DBH", "TH"))
-gene_set_list_mesenchymal <- list(MES = c("PRRX1", "RUNX1", "FOSL1", "JUN", "YAP1", "WWTR1", "MEOX1", 
-                                          "MEOX2", "SNAI2", "CD44", "FN1", "VIM"))
+gene_set_list_adrenergic <-list(ADRN = c("DLK1", "DBH", "PHOX2A", "PHOX2B", "GATA2", "GATA3"))
+gene_set_list_mesenchymal <- list(MES = c("FN1", "VIM", "SNAI2", "PRRX1", "YAP1", "WWTR1"))
 
 gene_set_list_chromaffin <- list(chromaffin = c("TH", "DBH", "DDC", "CHGA", "PNMT"))
 gene_set_list_scp <- list(scp =  c("CDH19", "PLP1", "ERBB3", "MPZ", "ERBB4"))
-gene_set_list_neuroblast <- list(neuroblast = c("NEFM", "GAP43", "STMN2", "ISL1"))
 gene_set_list_lateNeuroblast <- list(lateNeuroblast = c("SYN3", "IL7", "GAP43", "STMN2", "ISL1"))
 gene_set_list_bridge <- list(bridge = c("ERBB4", "ASCL1", "CDH9", "CTTNBP2"))
 gene_set_list_proliferation <- list(proliferation = c("MKI67", "PCNA", "BIRC5", "CEP55", "TOP2A", "CDK1", "CDC20", "CCNB1", 
                                                       "CCNB2", "CCNA2", "UBE2C", "AURKA", "AURKB", "PLK1", "PTTG1", "NUSAP1"))
+gene_set_list_earlyNeuroblast <- list(earlyNeuroblast = c("MKI67", "TOP2A", "ALK", "ISL1", "STMN2"))
 
 
 gsvapar <- gsvaParam(as.matrix(Expression), gene_set_list_adrenergic, kcdf = "Gaussian")
@@ -569,7 +567,7 @@ gsva_result3 <- gsva(gsvapar3)
 gsvapar4 <- gsvaParam(as.matrix(Expression), gene_set_list_scp, kcdf = "Gaussian")
 gsva_result4 <- gsva(gsvapar4)
 
-gsvapar5 <- gsvaParam(as.matrix(Expression), gene_set_list_neuroblast, kcdf = "Gaussian")
+gsvapar5 <- gsvaParam(as.matrix(Expression), gene_set_list_earlyNeuroblast, kcdf = "Gaussian")
 gsva_result5 <- gsva(gsvapar5)
 
 gsvapar6 <- gsvaParam(as.matrix(Expression), gene_set_list_lateNeuroblast, kcdf = "Gaussian")
@@ -771,7 +769,7 @@ proliferation_ord_noTMM <- proliferation_ord[proliferation_ord$TMM == "NO_TMM", 
 
 
 # t-test doing difference between GSVA Score of high, intermediate and low risk in NO_TMM.
-ggplot(proliferation_ord_noTMM, aes(x = COG.Risk.Group, y = GSVA_Score, fill = COG.Risk.Group, color = COG.Risk.Group)) +
+ggplot(proliferation_ord, aes(x = COG.Risk.Group, y = GSVA_Score, fill = COG.Risk.Group, color = COG.Risk.Group)) +
   geom_boxplot(size = 0.2, alpha = 0.5, outlier.shape = NA) +
   geom_point(position = position_jitter(width = 0.2), size = 3) +
   scale_fill_manual(values = c("High Risk" = "lightpink2", 
@@ -1042,7 +1040,7 @@ ggplot(GSVA_long, aes(x = TMM, y = GSVA_Score, fill = TMM, color = TMM)) +
                      label.y = 1.4)
 
 # now, based on risk groups.
-ggplot(GSVA_long[GSVA_long$TMM == "NO_TMM", ], aes(x = COG.Risk.Group, y = GSVA_Score, fill = COG.Risk.Group, color = COG.Risk.Group)) +
+ggplot(GSVA_long, aes(x = COG.Risk.Group, y = GSVA_Score, fill = COG.Risk.Group, color = COG.Risk.Group)) +
   geom_boxplot(size = 0.2, alpha = 0.5, outlier.shape = NA) +
   geom_point(position = position_jitter(width = 0.2), size = 3) +
   scale_fill_manual(values = c("High Risk" = "lightpink2", 
@@ -1132,7 +1130,95 @@ ggplot(GSVA_long, aes(x = COG.Risk.Group, y = GSVA_Score, fill = COG.Risk.Group,
                      label.y = 1.4)
 
 
+###
+
+### t-test: early Neuroblast gsva for different risk groups and TMM groups.
+source("DataCleaning.R")
+earlyNeuroblast <- list(earlyNeuroblast = c("MKI67", "TOP2A", "ALK"))
+
+Expression <- as.matrix(Expression)
+gsva <- gsvaParam(Expression, earlyNeuroblast, kcdf = "Gaussian")
+GSVA_result <- gsva(gsva)
+GSVA_df <- as.data.frame(GSVA_result)
+GSVA_long <- pivot_longer(GSVA_df, cols = everything(), names_to = "SampleID", values_to = "GSVA_Score")
+
+GSVA_long <- merge(GSVA_long, metadata[, c("SampleID", "TMM", "COG.Risk.Group", "MYCN.status")], by = "SampleID")
+
+# boxplot: earlyNeuroblast markers GSVA vs. TMM.
+ggplot(GSVA_long, aes(x = TMM, y = GSVA_Score, fill = TMM, color = TMM)) +
+  geom_boxplot(size = 0.2, alpha = 0.5, outlier.shape = NA) +
+  geom_point(position = position_jitter(width = 0.2), size = 3) +
+  scale_fill_manual(values = c("Telomerase" = "lightpink2", 
+                               "NO_TMM" = "lightgreen",
+                               "ALT" = "blue")) +
+  scale_color_manual(values = c("Telomerase"="darkred", 
+                                "NO_TMM" = "darkgreen",
+                                "ALT" = "darkblue")) +
+  theme_classic() +
+  labs(x = "Class", y = "Early Neuroblast GSVA Score") +
+  theme(
+    axis.text.x = element_text(vjust = 1, hjust = 1),
+    axis.title = element_text(size = 18),
+    axis.text = element_text(size = 12, face = "bold"),
+    legend.position = "none"
+  ) +
+  stat_compare_means(comparisons = list(c("Telomerase","NO_TMM")), method= "t.test",
+                     method.args = list(alternative ="two.sided"), size = 6, tip.length = 0.01,
+                     label.y = 1.2) +
+  stat_compare_means(comparisons = list(c("NO_TMM","ALT")), method= "t.test",
+                     method.args = list(alternative ="two.sided"), size = 6, tip.length = 0.01,
+                     label.y = 1.4)
+
+# now, based on risk groups.
+ggplot(GSVA_long, aes(x = COG.Risk.Group, y = GSVA_Score, fill = COG.Risk.Group, color = COG.Risk.Group)) +
+  geom_boxplot(size = 0.2, alpha = 0.5, outlier.shape = NA) +
+  geom_point(position = position_jitter(width = 0.2), size = 3) +
+  scale_fill_manual(values = c("High Risk" = "lightpink2", 
+                               "Low Risk" = "lightgreen",
+                               "Intermediate Risk" = "blue")) +
+  scale_color_manual(values = c("High Risk"="darkred", 
+                                "Low Risk" = "darkgreen",
+                                "Intermediate Risk" = "darkblue")) +
+  theme_classic() +
+  labs(x = "Class", y = "Early Neuroblast GSVA Score") +
+  theme(
+    axis.text.x = element_text(vjust = 1, hjust = 1),
+    axis.title = element_text(size = 18),
+    axis.text = element_text(size = 12, face = "bold"),
+    legend.position = "none"
+  ) +
+  stat_compare_means(comparisons = list(c("High Risk","Low Risk")), method= "t.test",
+                     method.args = list(alternative ="two.sided"), size = 6, tip.length = 0.01,
+                     label.y = 1.2) +
+  stat_compare_means(comparisons = list(c("High Risk","Intermediate Risk")), method= "t.test",
+                     method.args = list(alternative ="two.sided"), size = 6, tip.length = 0.01,
+                     label.y = 1.4)
+
+# t-test doing difference between GSVA Score of mycn amplified, non-amplified.
+ggplot(GSVA_long, aes(x = MYCN.status, y = GSVA_Score, fill = MYCN.status, color = MYCN.status)) +
+  geom_boxplot(size = 0.2, alpha = 0.5, outlier.shape = NA) +
+  geom_point(position = position_jitter(width = 0.2), size = 3) +
+  scale_fill_manual(values = c("Amplified" = "lightpink2", 
+                               "Not Amplified" = "lightgreen")) +
+  scale_color_manual(values = c("Amplified"="darkred", 
+                                "Not Amplified" = "darkgreen")) +
+  theme_classic() +
+  labs(x = "Risk Group", y = "Early Neuroblasts Markers GSVA Score") +
+  theme(
+    axis.text.x = element_text(vjust = 1, hjust = 1),
+    axis.title = element_text(size = 18),
+    axis.text = element_text(size = 12, face = "bold"),
+    legend.position = "none"
+  ) +
+  stat_compare_means(comparisons = list(c("Amplified", "Not Amplified")), method= "t.test",
+                     method.args = list(alternative = "two.sided"), size = 6, tip.length = 0.01,
+                     label.y = 1.2)
+
+
+
 #############>>>>>>###############################
+#############>
+#############>
 #############>
 #############>
 #############

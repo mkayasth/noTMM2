@@ -79,6 +79,52 @@ ggplot(GSVA_long_proliferation, aes(y = NormEXTENDScores, x = GSVA_Score, colour
   )
 
 
+## scatterplot: adr gsva vs. proliferation gsva.
+source("DataCleaning.R")
+
+gene_set_list_proliferation <- list(proliferation = c("MKI67", "PCNA", "BIRC5", "CEP55", "TOP2A", "CDK1", "CDC20", "CCNB1", 
+                                                      "CCNB2", "CCNA2", "UBE2C", "AURKA", "AURKB", "PLK1", "PTTG1", "NUSAP1"))
+gsvapar <- gsvaParam(as.matrix(Expression), gene_set_list_proliferation, kcdf = "Gaussian")
+gsva_result <- gsva(gsvapar)
+GSVA_df <- as.data.frame(gsva_result)
+GSVA_long_proliferation <- pivot_longer(GSVA_df, cols = everything(), names_to = "SampleID", values_to = "GSVA_Score")
+
+gene_list_adrenergic <- list("ADR" = c("DLK1", "DBH", "PHOX2A", "PHOX2B", "GATA2", "GATA3"))
+
+gsvapar <- gsvaParam(as.matrix(Expression), gene_list_adrenergic, kcdf = "Gaussian")
+gsva_result <- gsva(gsvapar)
+GSVA_df <- as.data.frame(gsva_result)
+GSVA_long_adr <- pivot_longer(GSVA_df, cols = everything(), names_to = "SampleID", values_to = "GSVA_Score_Adr")
+
+# joining the two results.
+GSVA_long_adr <- left_join(GSVA_long_adr, GSVA_long_proliferation, by = "SampleID")
+GSVA_long_adr <- left_join(GSVA_long_adr, metadata[, c("SampleID", "COG.Risk.Group", "TMM")], by = "SampleID")
+
+# for scatterplot first computing Pearson correlation value.
+cor_val <- cor(GSVA_long_adr$GSVA_Score_Adr, GSVA_long_adr$GSVA_Score, method = "pearson")
+r_text <- paste("r =", round(cor_val, 3))
+
+ggplot(GSVA_long_adr, aes(y = GSVA_Score_Adr, x = GSVA_Score, colour = TMM)) + 
+  scale_color_manual(values = c("ALT" = "darkblue", "Telomerase" = "darkred")) + 
+  geom_point(size = 4, alpha = 0.9) + 
+  labs(y = "GSVA Score from ADR Markers", x = "Proliferation GSVA Scores") + 
+  geom_smooth(method = "lm", level = 0.95, se = TRUE, color = "black", fill = "lightgray") + 
+  annotate("text", x = 0.25, y = 1.3, label = r_text, size = 7) +
+  theme_classic() +
+  theme(
+    axis.title.x = element_text(size = 24),
+    axis.title.y = element_text(size = 24),
+    axis.text.x  = element_text(size = 14, face = "bold"),
+    
+    axis.text.y  = element_text(size = 14, face = "bold"),
+    legend.title = element_text(size = 18, face = "bold"),
+    legend.text  = element_text(size = 16),
+    legend.position = c(-0.5, 1.3)
+  )
+
+
+## scatterplot: mes gsva vs. proliferation gsva.
+
 ## scatterplot: scp gsva vs. NO_TMM GSVA.
 source("DataCleaning.R")
 gene_set_list_scp <- list("SCP" = c("PLP1", "MPZ", "CDH19", "ERBB3", "ERBB4"))
@@ -803,22 +849,6 @@ ggplot(GSVA_long_adr, aes(y = GSVA_Score_Adr, x = GSVA_Score_chromaffin, colour 
     legend.position = c(-0.5, 1.3))
 
 
-ggplot(GSVA_long_adr, aes(y = GSVA_Score_Adr, x = GSVA_Score_chromaffin, colour = TMM)) + 
-  scale_color_manual(values = c("ALT" = "darkblue", "Telomerase" = "darkred")) + 
-  geom_point(size = 4, alpha = 0.9) + 
-  labs(y = "GSVA Score from ADR Markers", x = "Chromaffin GSVA Scores") + 
-  geom_smooth(method = "lm", level = 0.95, se = TRUE, color = "black", fill = "lightgray") + 
-  annotate("text", x = 0.25, y = 1.3, label = r_text, size = 7) +
-  theme_classic() +
-  theme(
-    axis.title.x = element_text(size = 24),
-    axis.title.y = element_text(size = 24),
-    axis.text.x  = element_text(size = 14, face = "bold"),
-    
-    axis.text.y  = element_text(size = 14, face = "bold"),
-    legend.title = element_text(size = 18, face = "bold"),
-    legend.text  = element_text(size = 16),
-    legend.position = c(-0.5, 1.3))
 
 ggplot(GSVA_long_adr, aes(y = GSVA_Score_Adr, x = GSVA_Score_chromaffin, colour = COG.Risk.Group)) + 
   scale_color_manual(values = c("Intermediate Risk" = "darkblue", "High Risk" = "darkred")) + 
@@ -898,23 +928,138 @@ ggplot(GSVA_long_adr, aes(y = GSVA_Score_Adr, x = GSVA_Score_chromaffin, colour 
     legend.position = c(-0.5, 1.3))
 
 
+# adrenergic vs. extend score.
+
+source("DataCleaning.R")
+
+
+extendScores <- RunEXTEND(as.matrix(Expression))
+telomeraseScores <- read_delim("TelomeraseScores.txt")
+telomeraseScores <- telomeraseScores[, c("SampleID", "NormEXTENDScores")]
+telomeraseScores <- as.data.frame(telomeraseScores)
+telomeraseScores <- left_join(telomeraseScores, metadata[, c("SampleID", "TMM", "COG.Risk.Group")], by = "SampleID")
+
+gene_list_adrenergic <- list("MES" = c("DLK1", "DBH", "PHOX2A", "PHOX2B", "GATA2", "GATA3"))
+
+
+gsvapar <- gsvaParam(as.matrix(Expression), gene_list_adrenergic, kcdf = "Gaussian")
+gsva_result <- gsva(gsvapar)
+GSVA_df <- as.data.frame(gsva_result)
+GSVA_long_adr <- pivot_longer(GSVA_df, cols = everything(), names_to = "SampleID", values_to = "GSVA_Score_Adr")
+
+# joining the two results.
+GSVA_long_adr <- left_join(GSVA_long_adr, telomeraseScores, by = "SampleID")
+
+# for scatterplot first computing Pearson correlation value.
+cor_val <- cor(GSVA_long_adr$GSVA_Score_Adr, GSVA_long_adr$NormEXTENDScores, method = "pearson")
+r_text <- paste("r =", round(cor_val, 3))
+
+ggplot(GSVA_long_adr, aes(y = GSVA_Score_Adr, x = NormEXTENDScores, colour = TMM)) + 
+  scale_color_manual(values = c("ALT" = "darkblue", "Telomerase" = "darkred")) + 
+  geom_point(size = 4, alpha = 0.9) + 
+  labs(y = "GSVA Score from ADR Markers", x = "EXTEND Scores") + 
+  geom_smooth(method = "lm", level = 0.95, se = TRUE, color = "black", fill = "lightgray") + 
+  annotate("text", x = 0.25, y = 1.3, label = r_text, size = 7) +
+  theme_classic() +
+  theme(
+    axis.title.x = element_text(size = 24),
+    axis.title.y = element_text(size = 24),
+    axis.text.x  = element_text(size = 14, face = "bold"),
+    
+    axis.text.y  = element_text(size = 14, face = "bold"),
+    legend.title = element_text(size = 18, face = "bold"),
+    legend.text  = element_text(size = 16),
+    legend.position = c(-0.5, 1.3)
+  )
+
+
+## adrenergic vs. NO_TMM GSVA.
+source("DataCleaning.R")
+gene_list_adrenergic <- list("ADR" = c("DLK1", "DBH", "PHOX2A", "PHOX2B", "GATA2", "GATA3"))
+
+gene_list_noTMM <- list("NO_TMM Genes" = c("CPNE8", "PGM2L1", "CNR1", "LIFR", "HOXC9", "SNX16", "HECW2", "ALDH3A2",
+                                           "THSD7A", "CPNE3", "IGSF10"))
+
+Expression <- as.matrix(Expression)
+noTMM_gsva <- gsvaParam(Expression, gene_list_noTMM, kcdf = "Gaussian")
+GSVA_result_noTMM <- gsva(noTMM_gsva)
+GSVA_df_noTMM <- as.data.frame(GSVA_result_noTMM)
+GSVA_long_noTMM <- pivot_longer(GSVA_df_noTMM, cols = everything(), names_to = "SampleID", values_to = "GSVA_Score")
+
+
+gsvapar <- gsvaParam(as.matrix(Expression), gene_list_adrenergic, kcdf = "Gaussian")
+gsva_result <- gsva(gsvapar)
+GSVA_df <- as.data.frame(gsva_result)
+GSVA_long_adr <- pivot_longer(GSVA_df, cols = everything(), names_to = "SampleID", values_to = "GSVA_Score_Adr")
+
+# joining the two results.
+GSVA_long_adr <- left_join(GSVA_long_adr, GSVA_long_noTMM, by = "SampleID")
+GSVA_long_adr <- left_join(GSVA_long_adr, metadata[, c("SampleID", "COG.Risk.Group", "TMM")], by = "SampleID")
+
+# for scatterplot first computing Pearson correlation value.
+cor_val <- cor(GSVA_long_adr$GSVA_Score_Adr, GSVA_long_adr$GSVA_Score, method = "pearson")
+r_text <- paste("r =", round(cor_val, 3))
+
+ggplot(GSVA_long_adr, aes(y = GSVA_Score_Adr, x = GSVA_Score, colour = TMM)) + 
+  scale_color_manual(values = c("ALT" = "darkblue", "Telomerase" = "darkred")) + 
+  geom_point(size = 4, alpha = 0.9) + 
+  labs(y = "GSVA Score from ADR Markers", x = "NO_TMM GSVA Scores") + 
+  geom_smooth(method = "lm", level = 0.95, se = TRUE, color = "black", fill = "lightgray") + 
+  annotate("text", x = 0.25, y = 1.3, label = r_text, size = 7) +
+  theme_classic() +
+  theme(
+    axis.title.x = element_text(size = 24),
+    axis.title.y = element_text(size = 24),
+    axis.text.x  = element_text(size = 14, face = "bold"),
+    
+    axis.text.y  = element_text(size = 14, face = "bold"),
+    legend.title = element_text(size = 18, face = "bold"),
+    legend.text  = element_text(size = 16),
+    legend.position = c(-0.5, 1.3)
+  )
+
+ggplot(GSVA_long_adr, aes(y = GSVA_Score_Adr, x = GSVA_Score, colour = COG.Risk.Group)) + 
+  scale_color_manual(values = c("Intermediate Risk" = "darkblue", "High Risk" = "darkred")) + 
+  geom_point(size = 4, alpha = 0.9) + 
+  labs(y = "GSVA Score from ADR Markers", x = "NO_TMM GSVA Scores") + 
+  geom_smooth(method = "lm", level = 0.95, se = TRUE, color = "black", fill = "lightgray") + 
+  annotate("text", x = 0.25, y = 1.3, label = r_text, size = 7) +
+  theme_classic() +
+  theme(
+    axis.title.x = element_text(size = 24),
+    axis.title.y = element_text(size = 24),
+    axis.text.x  = element_text(size = 14, face = "bold"),
+    
+    axis.text.y  = element_text(size = 14, face = "bold"),
+    legend.title = element_text(size = 18, face = "bold"),
+    legend.text  = element_text(size = 16),
+    legend.position = c(-0.5, 1.3)
+  )
+
+
+
+#######################################################################################
+
+
 
 ### ADRN score vs. MES score.
 source("DataCleaning.R")
+
+
 
 gene_sets_phenotype <- list(
   ADR = c("DLK1", "DBH", "PHOX2A", "PHOX2B", "GATA2", "GATA3"),
   MES = c("VIM", "FN1", "YAP1", "SNAI2", "PRRX1", "WWTR1")
 )
 
-gene_sets_phenotype <- list(
-  ADR = c("KLF7", "GATA3", "HAND2", "PHOX2A", "ISL1", "HAND1",
-          "PHOX2B", "TFAP2B", "GATA2", "SATB1", "SIX3", "EYA1",
-          "SOX11", "DACH1", "ASCL1", "HEY1", "KLF13", "PBX3"),
-  MES = c("VIM", "FN1", "MEOX2", "ID1", "EGR3", "AEBP1", "CBFB", "IRF3", "IRF2", "IRF1", 
-          "TBX18", "MAFF", "RUNX2", "ZFP36L1", "NR3C1", "BHLHE41", "GLIS3", "RUNX1", "FOSL1",
-          "FOSL2", "ELK4", "IFI16", "SIX4", "FLI1", "MAML2", "SMAD3", "DCAF6", "WWTR1", "SOX9", 
-          "MEF2D", "ZNF217", "PRRX1", "CREG1", "NOTCH2", "SIX1", "MEOX1"))
+# gene_sets_phenotype <- list(
+#   ADR = c("KLF7", "GATA3", "HAND2", "PHOX2A", "ISL1", "HAND1",
+#           "PHOX2B", "TFAP2B", "GATA2", "SATB1", "SIX3", "EYA1",
+#           "SOX11", "DACH1", "ASCL1", "HEY1", "KLF13", "PBX3"),
+#   MES = c("VIM", "FN1", "MEOX2", "ID1", "EGR3", "AEBP1", "CBFB", "IRF3", "IRF2", "IRF1", 
+#           "TBX18", "MAFF", "RUNX2", "ZFP36L1", "NR3C1", "BHLHE41", "GLIS3", "RUNX1", "FOSL1",
+#           "FOSL2", "ELK4", "IFI16", "SIX4", "FLI1", "MAML2", "SMAD3", "DCAF6", "WWTR1", "SOX9", 
+#           "MEF2D", "ZNF217", "PRRX1", "CREG1", "NOTCH2", "SIX1", "MEOX1"))
 
 
 gsvapar <- gsvaParam(as.matrix(Expression), gene_sets_phenotype, kcdf = "Gaussian")
