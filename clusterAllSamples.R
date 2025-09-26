@@ -205,7 +205,7 @@ ExpressionFpkm <- ExpressionFpkm[, match(metadata$SampleID, colnames(ExpressionF
 ranked_TARGET_NBL <- apply(ExpressionFpkm, 2, function(x) rank(x, ties.method = "average"))
 
 gene_list_together <- c("CPNE8", "PGM2L1", "LIFR", "CNR1", "HECW2", "CPNE3", "HOXC9", "SNX16", "IGSF10",
-                                           "PRR7", "IGLV6-57", "SAC3D1", "CCDC86", "DDN") # from aucGSVA: genes most upregulated and downregulated in NO_TMM.
+                        "PRR7", "IGLV6-57", "SAC3D1", "CCDC86", "DDN") # from aucGSVA: genes most upregulated and downregulated in NO_TMM.
 
 
 ## only looking at the DGE genes -- common in NO_TMM vs. ALT and NO_TMM vs. Telomerase.
@@ -454,15 +454,3 @@ plot(umap_res, col = km_res$cluster, pch = 19,
 legend("topright", 
        legend = paste("Cluster", sort(unique(km_res$cluster))), 
        col = colors, pch = 19)
-
-
-
-
-
-
-
-
-
-
-
-

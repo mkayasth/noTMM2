@@ -333,3 +333,185 @@ b_ <- run_exhaustive_forward_auc(expr_matrix = Expression, metadata = metadata, 
                                  pivot_gene = "PRR7")
 
 
+
+
+
+#################################################################################################
+
+# for the new data.
+
+source("0532Data.R")
+
+
+run_exhaustive_forward_auc <- function(expr_matrix, metadata, candidate_genes, 
+                                       phenotype_col,
+                                       label_one, label_two, # label one would be NO_TMM; label two would be TMM in our case.
+                                       max_genes,
+                                       pivot_gene = "CPNE8")  {  # gene giving the best results from linear regression test.
+  expr_matrix <- as.matrix(expr_matrix)
+  stopifnot("SampleID" %in% colnames(metadata))
+  
+  # aligning samples.
+  group_labels <- metadata[[phenotype_col]]
+  one_samples  <- metadata$RNAseq_SampleID[group_labels == label_one]
+  two_samples  <- metadata$RNAseq_SampleID[group_labels == label_two]
+  keep_samples <- sort(intersect(colnames(expr_matrix), c(one_samples, two_samples)))
+  
+  binary_labels <- setNames(ifelse(keep_samples %in% one_samples, 1, 0), keep_samples) # for auc.
+  
+  
+  # helper function: GSVA score for a gene set on aligned samples
+  .gsva_scores <- function(genes) {
+    
+    
+    param <- gsvaParam(
+      exprData = expr_matrix[, keep_samples, drop = FALSE],
+      geneSets = list(sig = genes),
+      kcdf     = "Gaussian" # for our log counts data.
+    )
+    mat <- gsva(param, verbose = FALSE)
+    as.numeric(mat["sig", ])
+  }
+  
+  selected_genes <- intersect(pivot_gene, rownames(expr_matrix))
+  
+  seed_scores <- .gsva_scores(selected_genes)
+  if (is.null(seed_scores)) {
+    # falling back: pick the best single-gene seed from candidates with non-zero variance.
+    pool <- intersect(candidate_genes, rownames(expr_matrix))
+    # drop zero-variance candidates
+    zv <- apply(expr_matrix[pool, keep_samples, drop=FALSE], 1, function(x) sd(x, na.rm=TRUE) == 0)
+    pool <- pool[!zv]
+    if (length(pool) == 0) 
+      stop("No candidate genes with non-zero variance in kept samples.")
+    
+    # picking the one with highest AUC.
+    best_auc <- -Inf
+    best_gene <- NULL
+    best_scores <- NULL
+    
+    for (g in pool) {
+      sc <- .gsva_scores(g)
+      if (is.null(sc)) next
+      names(sc) <- keep_samples
+      a <- as.numeric(auc(roc(binary_labels, sc, quiet = TRUE)))
+      if (!is.na(a) && a > best_auc) {
+        best_auc <- a; 
+        best_gene <- g; 
+        best_scores <- sc
+      }
+    }
+    if (is.null(best_gene)) 
+      stop("Unable to initialize a seed gene for GSVA.")
+    
+    selected_genes <- best_gene
+    scores0 <- best_scores
+    auc0 <- best_auc
+    message("Best combination so far: ", best_gene, " | AUC = ", round(auc0, 4))
+  } 
+  
+  else {
+    names(seed_scores) <- keep_samples
+    auc0 <- as.numeric(auc(roc(binary_labels, seed_scores, quiet = TRUE)))
+    scores0 <- seed_scores
+    message("Baseline (", pivot_gene, "): AUC = ", round(auc0, 4))
+  }
+  
+  best_auc <- auc0
+  results <- list()
+  results[[1]] <- list(genes = selected_genes, auc = best_auc, scores = scores0)
+  
+  # remaining genes.
+  remaining_genes <- setdiff(intersect(candidate_genes, rownames(expr_matrix)), selected_genes)
+  
+  # forward selection.
+  while (length(selected_genes) < max_genes && length(remaining_genes) > 0) {
+    best_iteration_auc <- -Inf
+    best_gene <- NULL
+    best_result <- NULL
+    
+    for (gene in remaining_genes) {
+      test_genes <- c(selected_genes, gene)
+      sc <- .gsva_scores(test_genes)
+      if (is.null(sc)) 
+        next
+      names(sc) <- keep_samples
+      
+      roc_obj <- roc(binary_labels, sc, quiet = TRUE)
+      current_auc <- as.numeric(auc(roc_obj))
+      
+      if (!is.na(current_auc) && current_auc > best_iteration_auc) {
+        best_iteration_auc <- current_auc
+        best_gene <- gene
+        best_result <- list(
+          genes  = test_genes,
+          auc    = current_auc,
+          roc    = roc_obj,
+          scores = sc
+        )
+      }
+    }
+    
+    if (is.null(best_gene) || best_iteration_auc <= best_auc) {
+      message("Stopping: No AUC improvement at size ", length(selected_genes) + 1)
+      break
+    }
+    
+    selected_genes <- c(selected_genes, best_gene)
+    best_auc <- best_iteration_auc
+    results[[length(selected_genes)]] <- best_result
+    remaining_genes <- setdiff(remaining_genes, best_gene)
+    
+    message("Step ", length(selected_genes), ": Added ", best_gene, " | AUC = ", round(best_auc, 4))
+  }
+  
+  list(final_genes = selected_genes, final_auc = best_auc, results = results)
+}
+
+
+regression_results_ALT_sig_positive <- regression_results_ALT_sig[regression_results_ALT_sig$estimate > 0, ] # upregulated in NO_TMM.
+regression_results_ALT_sig_positive <- regression_results_ALT_sig_positive %>%
+  arrange(desc(R.Squared))
+
+regression_results_ALT_sig_negative <- regression_results_ALT_sig[regression_results_ALT_sig$estimate < 0, ] # upregulated in ALT.
+regression_results_ALT_sig_negative <- regression_results_ALT_sig_negative %>%
+  arrange(desc(R.Squared))
+
+regression_results_Telomerase_sig_positive <- regression_results_Telomerase_sig[regression_results_Telomerase_sig$estimate > 0, ] # upregulated in NO_TMM.
+regression_results_Telomerase_sig_positive <- regression_results_Telomerase_sig_positive %>%
+  arrange(desc(R.Squared))
+
+regression_results_Telomerase_sig_negative <- regression_results_Telomerase_sig[regression_results_Telomerase_sig$estimate < 0, ] # upregulated in Telomerase
+regression_results_Telomerase_sig_negative <- regression_results_Telomerase_sig_negative %>%
+  arrange(desc(R.Squared))
+
+
+# combining positive and negatives and separating NO_TMM from TMM.
+
+regression_results_pos <- rbind(regression_results_ALT_sig_positive, regression_results_Telomerase_sig_positive)
+regression_results_pos <- regression_results_pos %>%
+  arrange(desc(R.Squared))
+
+
+regression_results_neg <- rbind(regression_results_ALT_sig_negative, regression_results_Telomerase_sig_negative)
+regression_results_neg <- regression_results_neg %>%
+  arrange(desc(R.Squared))
+
+
+#####
+
+pos_0532 <- run_exhaustive_forward_auc(expr_matrix = tmm_lcpm, metadata = metadata_0532, candidate_genes = regression_results_pos$Gene, 
+                                       phenotype_col = "TMMCase",
+                                       label_one = "NO_TMM", label_two = "TMM",
+                                       max_genes = 20,
+                                       pivot_gene = "AMOTL1")
+
+neg_0532 <- run_exhaustive_forward_auc(expr_matrix = tmm_lcpm, metadata = metadata_0532, candidate_genes = regression_results_neg$Gene, 
+                                       phenotype_col = "TMMCase",
+                                       label_one = "NO_TMM", label_two = "TMM",
+                                       max_genes = 20,
+                                       pivot_gene = "TERT")
+
+
+
+

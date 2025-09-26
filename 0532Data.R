@@ -2,6 +2,7 @@ library(tidyverse)
 library(dplyr)
 library(biomaRt)
 library(edgeR)
+library(uwot)
 
 geneExpression <- readRDS("Kallisto_PTs_BC_Counts_Final_06222023.RDS")
 metadata_0532 <- read_delim("TMM_052_MetaFinal_09162025.txt")
@@ -345,6 +346,131 @@ regression_results_Telomerase_sig <- regression_results_Telomerase %>%
 #######################################################################################################
 
 ###########################################################################################################
+
+### clustering using these genes.
+
+# trying with gene rankings.
+ranked_tmm_lcpm <- apply(tmm_lcpm, 2, function(x) rank(x, ties.method = "average"))
+
+cluster_genes <- ranked_tmm_lcpm[
+  rownames(ranked_tmm_lcpm) %in% c("AMOTL1", "ADBR2", "DLGAP4", "CCBE1", "KIFAP3", "TERT", "MAGEC2", "MFSD11", "LRRC56"), ,
+  drop = FALSE
+]
+
+
+# Scale and transpose first.
+pca_scale <- scale(t(cluster_genes))
+
+# Run PCA
+pca_result <- prcomp(pca_scale, center = TRUE, scale. = TRUE)
+
+# plotting the visualize the variance.
+pca_var <- pca_result$sdev^2
+pca_var_explained <- pca_var / sum(pca_var)
+
+
+# Make full scree plot to identify plateau.
+plot(pca_var_explained * 100, type = "b", pch = 19,
+     xlab = "Principal Component",
+     ylab = "Variance Explained (%)",
+     main = "Scree Plot: Full PCA")
+
+# From the elbow plot, graph seems to plateau at PC:1-10.
+pc_scores <- pca_result$x[, 1:3]
+
+##### Clustering the whole expression data.
+
+# k-means clustering.
+set.seed(123)
+umap_res <- umap(pc_scores)
+
+km_res <- kmeans(umap_res, centers = 2)
+
+# Plotting with clusters.
+tmm_colors <- c("TERT+" = "red", "TMM-" = "green", "ALT+" = "blue")
+
+plot(umap_res, col = tmm_colors[metadata_0532$TMM], pch = 19,
+     xlab = "UMAP 1", ylab = "UMAP 2", main = "k-means Clusters on UMAP")
+
+########
+
+## gsva t-test to see the difference.
+pos_0532 <- list(NO_TMM = c("AMOTL1", "ADRB2", "DLGAP4", "CCBE1", "KIFAP3"))
+neg_0532 <- list(MO_TMM = c("TERT", "MAGEC2", "MFSD11", "LRRC56"))
+
+
+# genes positively upregulated in NO_TMM.
+gsvapar <- gsvaParam(as.matrix(tmm_lcpm), pos_0532, kcdf = "Gaussian")
+gsva_result <- gsva(gsvapar)
+gsva_result <- as.data.frame(gsva_result)
+rownames(gsva_result) <- NULL
+
+
+gsva_long <- gsva_result %>%
+  pivot_longer(cols = everything(),
+               names_to = "SampleID",
+               values_to = "GSVA_Score"
+  )
+
+
+gsva_long <- left_join(gsva_long, metadata_0532[, c("RNAseq_SampleID", "TMM", "TMMCase")], by = c("SampleID" = "RNAseq_SampleID"))
+
+
+ggplot(gsva_long, aes(x = TMMCase, y = GSVA_Score, fill = TMMCase, color = TMMCase)) +
+  geom_boxplot(size = 0.2, alpha = 0.5, outlier.shape = NA) +
+  geom_point(position = position_jitter(width = 0.2), size = 3) +
+  scale_fill_manual(values = c("TMM" = "lightpink2", 
+                               "NO_TMM" = "lightgreen")) +
+  scale_color_manual(values = c("TMM"="darkred", 
+                                "NO_TMM" = "darkgreen")) +
+  theme_classic() +
+  labs(x = "TM Group", y = "GSVA Score") +
+  theme(
+    axis.text.x = element_text(vjust = 1, hjust = 1),
+    axis.title = element_text(size = 18),
+    axis.text = element_text(size = 12, face = "bold"),
+    legend.position = "none"
+  ) +
+  stat_compare_means(comparisons = list(c("TMM","NO_TMM")), method= "t.test",
+                     method.args = list(alternative ="two.sided"), size = 6, tip.length = 0.01,
+                     label.y = 1.2)
+
+# genes upregulated in TMM.
+gsvapar <- gsvaParam(as.matrix(tmm_lcpm), neg_0532, kcdf = "Gaussian")
+gsva_result <- gsva(gsvapar)
+gsva_result <- as.data.frame(gsva_result)
+rownames(gsva_result) <- NULL
+
+
+gsva_long <- gsva_result %>%
+  pivot_longer(cols = everything(),
+               names_to = "SampleID",
+               values_to = "GSVA_Score"
+  )
+
+
+gsva_long <- left_join(gsva_long, metadata_0532[, c("RNAseq_SampleID", "TMM", "TMMCase")], by = c("SampleID" = "RNAseq_SampleID"))
+
+
+ggplot(gsva_long, aes(x = TMMCase, y = GSVA_Score, fill = TMMCase, color = TMMCase)) +
+  geom_boxplot(size = 0.2, alpha = 0.5, outlier.shape = NA) +
+  geom_point(position = position_jitter(width = 0.2), size = 3) +
+  scale_fill_manual(values = c("TMM" = "lightpink2", 
+                               "NO_TMM" = "lightgreen")) +
+  scale_color_manual(values = c("TMM"="darkred", 
+                                "NO_TMM" = "darkgreen")) +
+  theme_classic() +
+  labs(x = "TM Group", y = "GSVA Score") +
+  theme(
+    axis.text.x = element_text(vjust = 1, hjust = 1),
+    axis.title = element_text(size = 18),
+    axis.text = element_text(size = 12, face = "bold"),
+    legend.position = "none"
+  ) +
+  stat_compare_means(comparisons = list(c("TMM","NO_TMM")), method= "t.test",
+                     method.args = list(alternative ="two.sided"), size = 6, tip.length = 0.01,
+                     label.y = 1.2)
+
 
 
 
